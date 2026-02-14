@@ -1,0 +1,12 @@
+# Netlify config: frontend only. Backend must be hosted separately (e.g. Render, Railway).
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  environment = { NODE_VERSION = "18" }
+
+# SPA: all routes serve index.html so React Router works
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
