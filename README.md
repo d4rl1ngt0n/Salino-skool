@@ -56,6 +56,43 @@ npm start
 npm run build
 ```
 
+## Push to GitHub
+
+1. **Create a new repository** on [GitHub](https://github.com/new):
+   - Name it (e.g. `salino-skool`), leave it empty (no README/license).
+   - Copy the repo URL (e.g. `https://github.com/yourusername/salino-skool.git`).
+
+2. **Add the remote and push** (from the project root):
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+   git branch -M main
+   git push -u origin main
+   ```
+   Replace `YOUR_USERNAME` and `YOUR_REPO` with your GitHub username and repo name.
+
+## Deploy on Render
+
+After the code is on GitHub, deploy the **backend** on Render so the API is live. Then deploy the **frontend** (Netlify or Render Static Site) and point it at the API.
+
+### 1. Backend (API) on Render
+
+1. Go to [Render](https://render.com) and sign in (or create an account). Connect your GitHub if prompted.
+2. **Dashboard → New + → Web Service**.
+3. Connect the repository that contains this project (e.g. `salino-skool`).
+4. Configure the service:
+   - **Name:** e.g. `salino-api`
+   - **Root Directory:** `server`
+   - **Runtime:** Node
+   - **Build Command:** `npm install && npm run build`
+   - **Start Command:** `npm start`
+5. **Create Web Service**. Render will build and deploy. Note the URL (e.g. `https://salino-api.onrender.com`).
+6. The backend uses SQLite and stores data in `server/data/`. On Render the filesystem is ephemeral, so data can reset on redeploy. For persistent data you’d later switch to a hosted DB (e.g. PostgreSQL on Render); for now the app will work and the default user will be re-created on each deploy.
+
+### 2. Frontend (optional: Render Static Site or Netlify)
+
+- **Render:** New + → **Static Site** → same repo, **Publish directory:** `dist`, **Build command:** `npm run build`. Add env var `VITE_API_URL` = `https://salino-api.onrender.com/api` (your backend URL + `/api`).
+- **Netlify:** See “Deploying to Netlify” below; set `VITE_API_URL` to your Render backend URL + `/api`.
+
 ## Deploying to Netlify (for others to access)
 
 The app has a **frontend** (this repo root) and a **backend** (`server/`). Netlify hosts static sites, so you deploy the frontend on Netlify and host the backend elsewhere.
