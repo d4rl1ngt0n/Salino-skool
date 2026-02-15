@@ -70,7 +70,46 @@ npm run build
    ```
    Replace `YOUR_USERNAME` and `YOUR_REPO` with your GitHub username and repo name.
 
-## Deploy on Render
+## Render CLI (deploy from terminal)
+
+With the [Render CLI](https://render.com/docs/cli) installed, you can manage deploys from the terminal.
+
+### Setup (one-time)
+
+```bash
+render login          # Opens browser to authenticate
+render workspace set  # Choose your workspace if prompted
+```
+
+### Common commands
+
+```bash
+# List your services and get IDs
+render services
+
+# Trigger a deploy for a service (use service ID from list above)
+render deploys create srv-xxxxx
+
+# Deploy and wait until complete
+render deploys create srv-xxxxx --wait
+
+# Stream live logs
+render services logs srv-xxxxx
+
+# Validate the Blueprint (render.yaml)
+render blueprints validate
+```
+
+### First-time: create services from Blueprint
+
+1. Push `render.yaml` to your repo (it defines the backend API).
+2. In [Render Dashboard](https://dashboard.render.com) → **New +** → **Blueprint**.
+3. Connect your GitHub repo. Render will create the `salino-api` Web Service from the Blueprint.
+4. After that, use the CLI to deploy: `render deploys create srv-<YOUR_API_SERVICE_ID>`.
+
+---
+
+## Deploy on Render (Dashboard)
 
 After the code is on GitHub, deploy the **backend** on Render so the API is live. Then deploy the **frontend** (Netlify or Render Static Site) and point it at the API.
 

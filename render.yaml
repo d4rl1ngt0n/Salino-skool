@@ -1,0 +1,11 @@
+# Render Blueprint: Salino backend API
+# Docs: https://render.com/docs/blueprint-spec
+# Deploy: Connect this repo as a Blueprint in Render Dashboard, or use CLI after services exist
+
+services:
+  - type: web
+    name: salino-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
