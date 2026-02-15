@@ -1,5 +1,4 @@
 import sqlite3 from 'sqlite3'
-import { promisify } from 'util'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { mkdirSync } from 'fs'
@@ -26,10 +25,46 @@ export const db = new sqlite3.Database(dbPath, (err) => {
   }
 })
 
-// Promisify database methods
-export const dbRun = promisify(db.run.bind(db))
-export const dbGet = promisify(db.get.bind(db))
-export const dbAll = promisify(db.all.bind(db))
+// Typed wrappers (promisify loses sqlite3 overloads for sql+params)
+export function dbRun(sql: string, params?: unknown[]): Promise<sqlite3.RunResult> {
+  return new Promise((resolve, reject) => {
+    const cb = function (this: sqlite3.RunResult, err: Error | null) {
+      if (err) reject(err)
+      else resolve(this)
+    }
+    if (params && params.length > 0) {
+      db.run(sql, params, cb)
+    } else {
+      db.run(sql, cb)
+    }
+  })
+}
+export function dbGet<T = unknown>(sql: string, params?: unknown[]): Promise<T | undefined> {
+  return new Promise((resolve, reject) => {
+    const cb = (err: Error | null, row?: T) => {
+      if (err) reject(err)
+      else resolve(row)
+    }
+    if (params && params.length > 0) {
+      db.get(sql, params, cb)
+    } else {
+      db.get(sql, cb)
+    }
+  })
+}
+export function dbAll<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+  return new Promise((resolve, reject) => {
+    const cb = (err: Error | null, rows?: T[]) => {
+      if (err) reject(err)
+      else resolve(rows || [])
+    }
+    if (params && params.length > 0) {
+      db.all(sql, params, cb)
+    } else {
+      db.all(sql, cb)
+    }
+  })
+}
 
 export function initDatabase() {
   // Users table
