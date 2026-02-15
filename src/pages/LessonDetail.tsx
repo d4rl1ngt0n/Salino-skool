@@ -1,11 +1,10 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useCourses } from '../context/CourseContext'
 
 const LessonDetail = () => {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>()
   const { courses, getLesson, getCourseProgress, markLessonComplete, markLessonIncomplete } =
     useCourses()
-  const navigate = useNavigate()
 
   if (!courseId || !lessonId) {
     return <div>Invalid lesson</div>
