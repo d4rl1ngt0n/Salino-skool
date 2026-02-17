@@ -4,20 +4,34 @@ import { authenticateToken, AuthRequest } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/admin.js'
 import multer from 'multer'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { mkdirSync, writeFileSync } from 'fs'
 import { v4 as uuidv4 } from 'uuid'
 import { uploadFile, getFileUrl } from '../storage/supabase.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 const router = express.Router()
 
 // For serverless: use /tmp (Netlify Functions) or fallback to local uploads
+// IMPORTANT: Don't use import.meta.url in Netlify Functions (it's undefined in CJS bundle)
+// Check NETLIFY env var FIRST before any import.meta usage
 const uploadsDir = process.env.NETLIFY 
   ? '/tmp/uploads' 
-  : path.join(__dirname, '../../uploads')
+  : (() => {
+      // Only use import.meta.url for local development (ESM context)
+      try {
+        // Dynamic import to avoid issues if import.meta.url is undefined
+        const { fileURLToPath } = require('url')
+        // @ts-ignore - import.meta.url may be undefined in CJS
+        if (typeof import.meta !== 'undefined' && import.meta.url) {
+          const __filename = fileURLToPath(import.meta.url)
+          const __dirname = path.dirname(__filename)
+          return path.join(__dirname, '../../uploads')
+        }
+      } catch (e) {
+        // If import.meta.url fails, use process.cwd() fallback
+      }
+      // Fallback to process.cwd() based path
+      return path.join(process.cwd(), 'server', 'uploads')
+    })()
 
 try {
   mkdirSync(uploadsDir, { recursive: true })
