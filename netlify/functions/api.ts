@@ -1,5 +1,10 @@
 // Netlify Function wrapper for Express backend
 // This allows us to run the entire Express app as a serverless function on Netlify
+
+// CRITICAL: Set NETLIFY env var BEFORE importing any routes
+// Routes use this to avoid import.meta.url (which is undefined in CJS bundle)
+process.env.NETLIFY = 'true'
+
 import serverless from 'serverless-http'
 import express from 'express'
 import cors from 'cors'
@@ -12,9 +17,6 @@ import authRoutes from '../../server/src/routes/auth.js'
 import courseRoutes from '../../server/src/routes/courses.js'
 import userRoutes from '../../server/src/routes/users.js'
 import resourcesRoutes from '../../server/src/routes/resources.js'
-
-// Set NETLIFY env var so routes know we're in serverless mode
-process.env.NETLIFY = 'true'
 
 // Log environment status (for debugging) - only log if vars are set to avoid exposing values
 console.log('Netlify Function starting...')
