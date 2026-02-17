@@ -1,8 +1,16 @@
 export const getApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL
-  // Always hit backend directly so login works (backend has CORS enabled)
-  const defaultUrl = 'http://localhost:3001/api'
-  return (envUrl ?? defaultUrl).replace(/\/$/, '')
+  // If VITE_API_URL is set, use it (for legacy deployments with separate backend)
+  // Otherwise, use relative URL (works for Netlify Functions on same domain)
+  if (envUrl) {
+    return envUrl.replace(/\/?$/, '')
+  }
+  // Relative URL works for Netlify Functions (proxied via netlify.toml)
+  // For local dev, still use localhost
+  if (import.meta.env.DEV) {
+    return 'http://localhost:3001/api'
+  }
+  return '/api'
 }
 
 /** Backend origin (no /api path) for file downloads etc. */
@@ -62,9 +70,14 @@ class ApiClient {
       return { data }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Network error'
-      // Check if it's a connection error
       if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
-        return { error: 'Cannot connect to server. Make sure the backend is running on http://localhost:3001' }
+        const apiUrl = getApiBaseUrl()
+        const isProd = apiUrl.includes('onrender.com') || apiUrl.includes('netlify')
+        return {
+          error: isProd
+            ? 'Cannot reach the API. The backend may be waking up (Render free tier sleeps after ~15 min). Try again in 30 sec, or check VITE_API_URL in your build env.'
+            : 'Cannot connect to server. Make sure the backend is running (e.g. npm run dev in the server folder).',
+        }
       }
       return { error: errorMessage }
     }

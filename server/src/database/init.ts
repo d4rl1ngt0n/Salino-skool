@@ -1,146 +1,157 @@
-import sqlite3 from 'sqlite3'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { mkdirSync } from 'fs'
+import { Pool, QueryResult } from 'pg'
 import bcrypt from 'bcryptjs'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-const dataDir = path.join(__dirname, '../../data')
-const dbPath = path.join(dataDir, 'salino.db')
-
-// Ensure data directory exists
-try {
-  mkdirSync(dataDir, { recursive: true })
-} catch (error) {
-  // Directory might already exist, ignore error
-}
-
-export const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err)
-  } else {
-    console.log('Connected to SQLite database')
-  }
+// PostgreSQL connection pool (Supabase provides DATABASE_URL)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
 })
 
-// Typed wrappers (promisify loses sqlite3 overloads for sql+params)
-export function dbRun(sql: string, params?: unknown[]): Promise<sqlite3.RunResult> {
-  return new Promise((resolve, reject) => {
-    const cb = function (this: sqlite3.RunResult, err: Error | null) {
-      if (err) reject(err)
-      else resolve(this)
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err)
+})
+
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database (Supabase)')
+})
+
+// Helper to convert SQLite-style ? placeholders to PostgreSQL $1, $2, $3 format
+// Also converts SQLite-specific syntax to PostgreSQL
+function convertPlaceholders(sql: string): string {
+  let paramIndex = 1
+  let converted = sql.replace(/\?/g, () => `$${paramIndex++}`)
+  
+  // Convert INSERT OR REPLACE to INSERT ... ON CONFLICT DO UPDATE
+  converted = converted.replace(
+    /INSERT OR REPLACE INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi,
+    (match, table, columns, values) => {
+      // Extract primary key column (usually 'id')
+      const pkCol = columns.split(',')[0].trim()
+      // Build UPDATE clause for all columns except the primary key
+      const updateCols = columns.split(',').slice(1).map((col: string) => {
+        const colName = col.trim()
+        return `${colName} = EXCLUDED.${colName}`
+      }).join(', ')
+      return `INSERT INTO ${table} (${columns}) VALUES (${values}) ON CONFLICT (${pkCol}) DO UPDATE SET ${updateCols}`
     }
-    if (params && params.length > 0) {
-      db.run(sql, params, cb)
-    } else {
-      db.run(sql, cb)
-    }
-  })
-}
-export function dbGet<T = unknown>(sql: string, params?: unknown[]): Promise<T | undefined> {
-  return new Promise((resolve, reject) => {
-    const cb = (err: Error | null, row?: T) => {
-      if (err) reject(err)
-      else resolve(row)
-    }
-    if (params && params.length > 0) {
-      db.get(sql, params, cb)
-    } else {
-      db.get(sql, cb)
-    }
-  })
-}
-export function dbAll<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
-  return new Promise((resolve, reject) => {
-    const cb = (err: Error | null, rows?: T[]) => {
-      if (err) reject(err)
-      else resolve(rows || [])
-    }
-    if (params && params.length > 0) {
-      db.all(sql, params, cb)
-    } else {
-      db.all(sql, cb)
-    }
-  })
+  )
+  
+  return converted
 }
 
-export function initDatabase() {
-  // Users table
-  dbRun(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
-      is_admin INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `).catch(console.error)
+// Typed wrappers compatible with existing code
+export interface RunResult {
+  rowCount: number
+}
 
-  // Courses table
-  dbRun(`
-    CREATE TABLE IF NOT EXISTS courses (
-      id TEXT PRIMARY KEY,
-      title TEXT NOT NULL,
-      description TEXT,
-      order_index INTEGER NOT NULL
-    )
-  `).catch(console.error)
+export async function dbRun(sql: string, params?: unknown[]): Promise<RunResult> {
+  const pgSql = convertPlaceholders(sql)
+  const result = await pool.query(pgSql, params)
+  return { rowCount: result.rowCount || 0 }
+}
 
-  // Lessons table
-  dbRun(`
-    CREATE TABLE IF NOT EXISTS lessons (
-      id TEXT PRIMARY KEY,
-      course_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      content TEXT,
-      video_url TEXT,
-      order_index INTEGER NOT NULL,
-      section TEXT,
-      FOREIGN KEY (course_id) REFERENCES courses(id)
-    )
-  `).catch(console.error)
+export async function dbGet<T = unknown>(sql: string, params?: unknown[]): Promise<T | undefined> {
+  const pgSql = convertPlaceholders(sql)
+  const result = await pool.query(pgSql, params)
+  return (result.rows[0] as T) || undefined
+}
 
-  // Course progress table
-  dbRun(`
-    CREATE TABLE IF NOT EXISTS course_progress (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      course_id TEXT NOT NULL,
-      lesson_id TEXT NOT NULL,
-      completed INTEGER DEFAULT 0,
-      completed_at DATETIME,
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (course_id) REFERENCES courses(id),
-      FOREIGN KEY (lesson_id) REFERENCES lessons(id),
-      UNIQUE(user_id, course_id, lesson_id)
-    )
-  `).catch(console.error)
+export async function dbAll<T = unknown>(sql: string, params?: unknown[]): Promise<T[]> {
+  const pgSql = convertPlaceholders(sql)
+  const result = await pool.query(pgSql, params)
+  return result.rows as T[]
+}
 
-  // Resources table
-  dbRun(`
-    CREATE TABLE IF NOT EXISTS resources (
-      id TEXT PRIMARY KEY,
-      course_id TEXT NOT NULL,
-      lesson_id TEXT,
-      title TEXT NOT NULL,
-      description TEXT,
-      resource_type TEXT DEFAULT "file",
-      file_url TEXT,
-      file_name TEXT,
-      saved_file_name TEXT,
-      file_size INTEGER,
-      file_type TEXT,
-      external_url TEXT,
-      uploaded_by TEXT NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (course_id) REFERENCES courses(id),
-      FOREIGN KEY (lesson_id) REFERENCES lessons(id),
-      FOREIGN KEY (uploaded_by) REFERENCES users(id)
-    )
-  `).catch(console.error)
+export const db = pool // For compatibility if anything references db directly
+
+export async function initDatabase() {
+  try {
+    // Users table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(255) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        is_admin BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
+    // Courses table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS courses (
+        id VARCHAR(255) PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        order_index INTEGER NOT NULL,
+        thumbnail_url TEXT
+      )
+    `)
+
+    // Lessons table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS lessons (
+        id VARCHAR(255) PRIMARY KEY,
+        course_id VARCHAR(255) NOT NULL,
+        title TEXT NOT NULL,
+        content TEXT,
+        video_url TEXT,
+        order_index INTEGER NOT NULL,
+        section TEXT,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+      )
+    `)
+
+    // Course progress table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS course_progress (
+        id VARCHAR(255) PRIMARY KEY,
+        user_id VARCHAR(255) NOT NULL,
+        course_id VARCHAR(255) NOT NULL,
+        lesson_id VARCHAR(255) NOT NULL,
+        completed BOOLEAN DEFAULT FALSE,
+        completed_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+        FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE,
+        UNIQUE(user_id, course_id, lesson_id)
+      )
+    `)
+
+    // Resources table
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS resources (
+        id VARCHAR(255) PRIMARY KEY,
+        course_id VARCHAR(255) NOT NULL,
+        lesson_id VARCHAR(255),
+        title TEXT NOT NULL,
+        description TEXT,
+        resource_type VARCHAR(50) DEFAULT 'file',
+        file_url TEXT,
+        file_name TEXT,
+        saved_file_name TEXT,
+        file_size BIGINT,
+        file_type VARCHAR(100),
+        external_url TEXT,
+        uploaded_by VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+        FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `)
+
+    // Init flags table (for one-time migrations)
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS init_flags (
+        name VARCHAR(255) PRIMARY KEY
+      )
+    `)
+  } catch (error) {
+    console.error('Error initializing database:', error)
+    throw error
+  }
 
   // Migrate existing databases to add is_admin column if it doesn't exist
   migrateDatabase().catch(console.error)
@@ -160,13 +171,18 @@ export function initDatabase() {
 
 async function migrateDatabase() {
   try {
-    // Check if is_admin column exists
-    const tableInfo = await dbAll("PRAGMA table_info(users)") as any[]
-    const hasAdminColumn = tableInfo.some((col) => col.name === 'is_admin')
+    // Check if is_admin column exists (PostgreSQL)
+    const result = await dbGet<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'is_admin'
+      ) as exists
+    `)
+    const hasAdminColumn = result?.exists === true
     
     if (!hasAdminColumn) {
       console.log('Migrating database: Adding is_admin column to users table...')
-      await dbRun('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
+      await dbRun('ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE')
       console.log('Migration complete: is_admin column added')
     }
   } catch (error) {
@@ -176,83 +192,40 @@ async function migrateDatabase() {
 
 async function migrateResourcesTable() {
   try {
-    // Check if saved_file_name column exists in resources table
-    const tableInfo = await dbAll("PRAGMA table_info(resources)") as any[]
-    const hasSavedFileNameColumn = tableInfo.some((col) => col.name === 'saved_file_name')
-    const hasResourceTypeColumn = tableInfo.some((col) => col.name === 'resource_type')
-    const hasExternalUrlColumn = tableInfo.some((col) => col.name === 'external_url')
+    // Check columns exist (PostgreSQL)
+    const columns = await dbAll<{ column_name: string }>(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'resources'
+    `)
+    const columnNames = columns.map((c) => c.column_name)
     
-    // Check if file_url has NOT NULL constraint (old schema)
-    const fileUrlColumn = tableInfo.find((col) => col.name === 'file_url')
-    const hasNotNullConstraint = fileUrlColumn && fileUrlColumn.notnull === 1
-    
-    if (!hasSavedFileNameColumn) {
+    if (!columnNames.includes('saved_file_name')) {
       console.log('Migrating database: Adding saved_file_name column to resources table...')
       await dbRun('ALTER TABLE resources ADD COLUMN saved_file_name TEXT')
       console.log('Migration complete: saved_file_name column added to resources table')
     }
     
-    if (!hasResourceTypeColumn) {
+    if (!columnNames.includes('resource_type')) {
       console.log('Migrating database: Adding resource_type column to resources table...')
-      await dbRun('ALTER TABLE resources ADD COLUMN resource_type TEXT DEFAULT "file"')
+      await dbRun("ALTER TABLE resources ADD COLUMN resource_type VARCHAR(50) DEFAULT 'file'")
       console.log('Migration complete: resource_type column added to resources table')
     }
     
-    if (!hasExternalUrlColumn) {
+    if (!columnNames.includes('external_url')) {
       console.log('Migrating database: Adding external_url column to resources table...')
       await dbRun('ALTER TABLE resources ADD COLUMN external_url TEXT')
       console.log('Migration complete: external_url column added to resources table')
     }
     
-    // If file_url has NOT NULL constraint, we need to recreate the table
-    // SQLite doesn't support dropping NOT NULL constraints directly
-    if (hasNotNullConstraint && fileUrlColumn) {
+    // PostgreSQL allows dropping NOT NULL directly
+    const fileUrlCol = await dbGet<{ is_nullable: string }>(`
+      SELECT is_nullable FROM information_schema.columns 
+      WHERE table_name = 'resources' AND column_name = 'file_url'
+    `)
+    if (fileUrlCol && fileUrlCol.is_nullable === 'NO') {
       console.log('Migrating database: Removing NOT NULL constraint from file_url column...')
-      try {
-        // Create new table with correct schema
-        await dbRun(`
-          CREATE TABLE resources_new (
-            id TEXT PRIMARY KEY,
-            course_id TEXT NOT NULL,
-            lesson_id TEXT,
-            title TEXT NOT NULL,
-            description TEXT,
-            resource_type TEXT DEFAULT "file",
-            file_url TEXT,
-            file_name TEXT,
-            saved_file_name TEXT,
-            file_size INTEGER,
-            file_type TEXT,
-            external_url TEXT,
-            uploaded_by TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (course_id) REFERENCES courses(id),
-            FOREIGN KEY (lesson_id) REFERENCES lessons(id),
-            FOREIGN KEY (uploaded_by) REFERENCES users(id)
-          )
-        `)
-        
-        // Copy data from old table
-        await dbRun(`
-          INSERT INTO resources_new 
-          SELECT id, course_id, lesson_id, title, description, 
-                 COALESCE(resource_type, 'file') as resource_type,
-                 file_url, file_name, saved_file_name, file_size, file_type, 
-                 external_url, uploaded_by, created_at
-          FROM resources
-        `)
-        
-        // Drop old table
-        await dbRun('DROP TABLE resources')
-        
-        // Rename new table
-        await dbRun('ALTER TABLE resources_new RENAME TO resources')
-        
-        console.log('Migration complete: file_url NOT NULL constraint removed')
-      } catch (error) {
-        console.error('Error migrating file_url constraint:', error)
-        // If migration fails, we'll handle NULL values in the INSERT statements
-      }
+      await dbRun('ALTER TABLE resources ALTER COLUMN file_url DROP NOT NULL')
+      console.log('Migration complete: file_url NOT NULL constraint removed')
     }
   } catch (error) {
     console.error('Error migrating resources table:', error)
@@ -261,8 +234,13 @@ async function migrateResourcesTable() {
 
 async function migrateLessonsSection() {
   try {
-    const tableInfo = await dbAll("PRAGMA table_info(lessons)") as any[]
-    const hasSectionColumn = tableInfo.some((col) => col.name === 'section')
+    const result = await dbGet<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'lessons' AND column_name = 'section'
+      ) as exists
+    `)
+    const hasSectionColumn = result?.exists === true
 
     if (!hasSectionColumn) {
       console.log('Migrating database: Adding section column to lessons table...')
@@ -276,8 +254,13 @@ async function migrateLessonsSection() {
 
 async function migrateCoursesThumbnail() {
   try {
-    const tableInfo = await dbAll("PRAGMA table_info(courses)") as any[]
-    const hasThumbnailUrl = tableInfo.some((col) => col.name === 'thumbnail_url')
+    const result = await dbGet<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'courses' AND column_name = 'thumbnail_url'
+      ) as exists
+    `)
+    const hasThumbnailUrl = result?.exists === true
 
     if (!hasThumbnailUrl) {
       console.log('Migrating database: Adding thumbnail_url column to courses table...')
@@ -293,7 +276,7 @@ async function migrateCoursesThumbnail() {
 // so user-edited or admin-updated video URLs are never overwritten on server restart.
 async function applyCourseStructuresOnce() {
   try {
-    await dbRun('CREATE TABLE IF NOT EXISTS init_flags (name TEXT PRIMARY KEY)')
+    await dbRun('CREATE TABLE IF NOT EXISTS init_flags (name VARCHAR(255) PRIMARY KEY)')
     const existing = await dbGet("SELECT 1 FROM init_flags WHERE name = 'course_structures_applied'") as any
     if (existing) {
       return // Already applied; don't overwrite videos on every startup
@@ -303,7 +286,7 @@ async function applyCourseStructuresOnce() {
       `SELECT 1 FROM lessons WHERE video_url IS NOT NULL AND video_url != '' AND video_url NOT LIKE '%placeholder-video.com%' LIMIT 1`
     ) as any[]
     if (lessonsWithRealVideos.length > 0) {
-      await dbRun("INSERT OR IGNORE INTO init_flags (name) VALUES ('course_structures_applied')")
+      await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO NOTHING")
       console.log('Course structures already have real videos; skipping structure overwrite (DB is source of truth)')
       return
     }
@@ -325,7 +308,7 @@ async function applyCourseStructuresOnce() {
     await updateCourse13Structure()
     await updateCourse14Structure()
     await updateCourse15Structure()
-    await dbRun("INSERT OR IGNORE INTO init_flags (name) VALUES ('course_structures_applied')")
+    await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO NOTHING")
     console.log('Course structures applied once (real video URLs). Future restarts will not overwrite lesson videos.')
   } catch (error) {
     console.error('Error in applyCourseStructuresOnce:', error)
@@ -1429,7 +1412,7 @@ async function insertDefaultUser() {
     
     await dbRun(
       'INSERT INTO users (id, name, email, password, is_admin) VALUES (?, ?, ?, ?, ?)',
-      [userId, 'Test User', 'test@salino.com', hashedPassword, 1]
+      [userId, 'Test User', 'test@salino.com', hashedPassword, true]
     )
 
     console.log('Default admin user created')

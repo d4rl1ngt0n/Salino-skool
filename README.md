@@ -6,22 +6,37 @@ A community and education platform by Salino GmbH.
 
 ### Backend Setup
 
-1. Navigate to the server directory:
+1. **Set up Supabase Database** (recommended for persistent data):
+   - Go to [Supabase](https://supabase.com) and create a free account
+   - Create a new project
+   - Go to **Settings → Database** and copy the **Connection string** (URI format)
+   - Set it as an environment variable:
+     ```bash
+     export DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres"
+     ```
+   - Or create a `.env` file in the `server/` directory:
+     ```
+     DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+     ```
+
+2. Navigate to the server directory:
 ```bash
 cd server
 ```
 
-2. Install dependencies:
+3. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Run the backend server:
+4. Run the backend server:
 ```bash
 npm run dev
 ```
 
 The backend API will be available at `http://localhost:3001`
+
+**Note:** The app now uses PostgreSQL (Supabase) instead of SQLite for persistent, cloud-hosted data. If `DATABASE_URL` is not set, the app will fail to start.
 
 ### Frontend Setup
 
@@ -109,7 +124,109 @@ render blueprints validate
 
 ---
 
-## Deploy on Render (Dashboard)
+## Deploy on Railway
+
+For the **backend** on Railway (same idea as Render):
+
+1. **Dashboard → New Project → Deploy from GitHub** → connect `Salino-skool`.
+2. **Add a service** → choose the repo.
+3. **Critical:** In **Settings → Root Directory**, set `server`.  
+   Without this, Railway builds the frontend (root) instead of the backend; the app has no `start` script and will crash.
+4. **Environment Variables:** Add `DATABASE_URL` from your Supabase project (Settings → Database → Connection string).
+5. **Build command:** `npm install && npm run build`  
+6. **Start command:** `npm start`  
+7. Deploy. Use the generated URL (e.g. `https://salino-api-production-xxx.up.railway.app`) + `/api` for `VITE_API_URL` in Netlify.
+
+---
+
+## 🚀 Deploy Everything on Netlify (Recommended - No Render/Railway Needed!)
+
+**You can now deploy the entire app on Netlify - both frontend AND backend!** No need for Render or Railway.
+
+### Quick Setup:
+
+1. **Create Supabase Project** (for database):
+   - Go to [Supabase](https://supabase.com) and create a free account
+   - Create a new project
+   - Go to **Settings → Database** and copy the **Connection string** (URI format)
+   - Also copy your **Project URL** and **anon/public key** from **Settings → API**
+
+2. **Set up Supabase Storage** (optional, for file uploads):
+   - In Supabase Dashboard → **Storage**
+   - The bucket `course-resources` will be created automatically on first upload
+   - Or create it manually and set it to **Private** (we use signed URLs)
+
+3. **Deploy to Netlify**:
+   - Push your code to GitHub
+   - Go to [Netlify](https://netlify.com) → **Add new site** → **Import from Git**
+   - Connect your GitHub repo
+   - **Build settings:**
+     - Build command: `npm run build`
+     - Publish directory: `dist`
+   - **Environment variables** (Site settings → Environment variables):
+     
+     Here's where to find each value in Supabase:
+     
+     ### 1. DATABASE_URL
+     - Go to your Supabase project dashboard
+     - Click **Settings** (gear icon) → **Database**
+     - Scroll down to **Connection string** section
+     - Select **URI** tab
+     - Copy the connection string (it looks like: `postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`)
+     - **Important:** Replace `[PASSWORD]` with your actual database password (set when creating the project, or reset it in Settings → Database → Database password)
+     - Use the **Connection pooling** URI (port 6543) for better performance, or the **Direct connection** (port 5432) if pooling doesn't work
+     
+     ### 2. SUPABASE_URL
+     - In Supabase dashboard → **Settings** → **API**
+     - Find **Project URL** (looks like: `https://[PROJECT-REF].supabase.co`)
+     - Copy this entire URL
+     
+     ### 3. SUPABASE_ANON_KEY
+     - In the same **Settings** → **API** page
+     - Find **Project API keys** section
+     - Copy the **anon** `public` key (the long string starting with `eyJ...`)
+     - This is safe to expose in frontend code, but keep it in environment variables for security
+     
+     ### 4. JWT_SECRET
+     - This is **NOT from Supabase** - you create this yourself!
+     - It's a random secret string used to sign JWT tokens for authentication
+     - Generate a random string (any length, but 32+ characters is recommended):
+       - **Option A:** Use an online generator: https://randomkeygen.com/ (use "CodeIgniter Encryption Keys")
+       - **Option B:** Run in terminal: `openssl rand -base64 32`
+       - **Option C:** Just use any random string like `my-super-secret-jwt-key-2024`
+     - Keep this secret - don't share it publicly!
+     
+     **Example values** (yours will be different):
+     ```
+     DATABASE_URL=postgresql://postgres.abcdefghijklmnop:MyPassword123@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+     SUPABASE_URL=https://abcdefghijklmnop.supabase.co
+     SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NjE2ODAwMCwiZXhwIjoxOTYxNzQ0MDAwfQ.example
+     JWT_SECRET=my-super-secret-jwt-key-change-this-to-something-random-12345
+     ```
+     
+     **Note:** You don't need `VITE_API_URL` anymore! The frontend uses relative `/api` URLs that are automatically proxied to Netlify Functions.
+   - Click **Deploy site**
+
+4. **That's it!** Your full-stack app is now live:
+   - Frontend: `https://your-site.netlify.app`
+   - Backend API: `https://your-site.netlify.app/api/*` (handled by Netlify Functions)
+
+### How It Works:
+
+- **Frontend**: Built with Vite and served as a static site
+- **Backend**: Express app wrapped as a Netlify Function (serverless) - no separate hosting needed!
+- **Database**: PostgreSQL on Supabase (persistent, cloud-hosted)
+- **File Storage**: Supabase Storage (if configured) or `/tmp` (temporary fallback)
+
+### Default Login:
+
+After first deploy, the default admin user is created:
+- Email: `test@salino.com`
+- Password: `test123`
+
+---
+
+## Deploy on Render (Dashboard) - Legacy Option
 
 After the code is on GitHub, deploy the **backend** on Render so the API is live. Then deploy the **frontend** (Netlify or Render Static Site) and point it at the API.
 
@@ -162,6 +279,20 @@ Your site will be at `https://<your-site>.netlify.app`. The frontend will call y
 ### 3. Optional: custom domain
 
 In Netlify: **Domain settings** → add your domain and follow the DNS steps.
+
+## Backend connection troubleshooting
+
+If the frontend can't reach the backend (login fails, "Backend not reachable", or timeout):
+
+1. **VITE_API_URL** must be set in the **build** environment (Netlify → Site settings → Environment variables). It’s read at build time.
+   - Value: `https://YOUR-RENDER-API.onrender.com/api` (include `/api`)
+   - Rebuild after changing env vars.
+
+2. **Render backend URL** – Copy it from the Render dashboard (e.g. `https://salino-api.onrender.com`). Use that + `/api` for VITE_API_URL.
+
+3. **Render free tier sleep** – Services sleep after ~15 min of no traffic. The first request may take 30–60 seconds. Try again after waiting.
+
+4. **Verify the API** – In a browser, open `https://YOUR-RENDER-API.onrender.com/api/health`. You should see `{"status":"ok",...}`. If it errors or times out, the backend is down or sleeping.
 
 ## Project Structure
 

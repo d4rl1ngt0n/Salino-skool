@@ -103,14 +103,14 @@ router.post('/:courseId/lessons/:lessonId/progress', authenticateToken, async (r
          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(user_id, course_id, lesson_id) 
          DO UPDATE SET completed = ?, completed_at = CURRENT_TIMESTAMP`,
-        [`${userId}-${courseId}-${lessonId}`, userId, courseId, lessonId, 1, 1]
+        [`${userId}-${courseId}-${lessonId}`, userId, courseId, lessonId, true, true]
       )
     } else {
       await dbRun(
         `UPDATE course_progress 
-         SET completed = 0, completed_at = NULL 
+         SET completed = ?, completed_at = NULL 
          WHERE user_id = ? AND course_id = ? AND lesson_id = ?`,
-        [userId, courseId, lessonId]
+        [false, userId, courseId, lessonId]
       )
     }
 

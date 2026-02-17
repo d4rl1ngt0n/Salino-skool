@@ -5,35 +5,29 @@ import { requireAdmin } from '../middleware/admin.js'
 import multer from 'multer'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { mkdirSync } from 'fs'
+import { mkdirSync, writeFileSync } from 'fs'
 import { v4 as uuidv4 } from 'uuid'
+import { uploadFile, getFileUrl } from '../storage/supabase.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const router = express.Router()
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, '../../uploads')
+// For serverless: use /tmp (Netlify Functions) or fallback to local uploads
+const uploadsDir = process.env.NETLIFY 
+  ? '/tmp/uploads' 
+  : path.join(__dirname, '../../uploads')
+
 try {
   mkdirSync(uploadsDir, { recursive: true })
 } catch (error) {
   // Directory might already exist
 }
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir)
-  },
-  filename: (req, file, cb) => {
-    const uniqueName = `${uuidv4()}-${file.originalname}`
-    cb(null, uniqueName)
-  },
-})
-
+// Use memory storage for serverless compatibility (files stored in memory, then saved)
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
@@ -168,8 +162,33 @@ router.post('/', authenticateToken, requireAdmin, upload.single('file'), async (
         return res.status(400).json({ error: 'No file uploaded' })
       }
 
-      const savedFileName = req.file.filename
-      const fileUrl = `/api/resources/files/${resourceId}`
+      const savedFileName = `${uuidv4()}-${req.file.originalname}`
+      let fileUrl = `/api/resources/files/${resourceId}`
+
+      // Try Supabase Storage first (if configured), otherwise use local storage
+      try {
+        if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+          // Convert buffer to Express.Multer.File-like object
+          const fileForSupabase = {
+            ...req.file,
+            buffer: req.file.buffer,
+          } as Express.Multer.File
+          
+          const uploadResult = await uploadFile(fileForSupabase, savedFileName)
+          if (uploadResult) {
+            fileUrl = uploadResult.url // Use Supabase signed URL
+          }
+        } else {
+          // Fallback: save to local filesystem (/tmp for serverless)
+          const filePath = path.join(uploadsDir, savedFileName)
+          writeFileSync(filePath, req.file.buffer)
+        }
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        // Fallback to local storage
+        const filePath = path.join(uploadsDir, savedFileName)
+        writeFileSync(filePath, req.file.buffer)
+      }
 
       await dbRun(
         `INSERT INTO resources (id, course_id, lesson_id, title, description, resource_type, file_url, file_name, saved_file_name, file_size, file_type, uploaded_by)
@@ -266,11 +285,26 @@ router.get('/files/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Resource not found' })
     }
 
-    // Use the saved_file_name if available
-    const fileName = resource.saved_file_name || resource.file_name
-    const filePath = path.join(uploadsDir, fileName)
+    // If file_url is a Supabase URL, redirect to it
+    if (resource.file_url && resource.file_url.startsWith('http')) {
+      return res.redirect(resource.file_url)
+    }
 
+    // Otherwise, try to get from Supabase Storage or local filesystem
+    const fileName = resource.saved_file_name || resource.file_name
+    
+    // Try Supabase Storage first
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+      const signedUrl = await getFileUrl(fileName)
+      if (signedUrl) {
+        return res.redirect(signedUrl)
+      }
+    }
+
+    // Fallback: local filesystem
+    const filePath = path.join(uploadsDir, fileName)
     const fs = await import('fs')
+    
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: 'File not found on server' })
     }
@@ -303,18 +337,25 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     // Admin can delete any resource, or user can delete their own
     // requireAdmin middleware already ensures user is admin, so we can delete any resource
 
-    // Delete the file from filesystem (only if it's a file resource)
+    // Delete the file from storage (only if it's a file resource)
     if (resource.resource_type !== 'url' && resource.saved_file_name) {
-      const fs = await import('fs')
       const fileName = resource.saved_file_name || resource.file_name
-      const filePath = path.join(uploadsDir, fileName)
       
-      try {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath)
+      // Try Supabase Storage first
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+        const { deleteFile } = await import('../storage/supabase.js')
+        await deleteFile(fileName)
+      } else {
+        // Fallback: local filesystem
+        const fs = await import('fs')
+        const filePath = path.join(uploadsDir, fileName)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        } catch (error) {
+          console.error('Error deleting file:', error)
         }
-      } catch (error) {
-        console.error('Error deleting file:', error)
       }
     }
 

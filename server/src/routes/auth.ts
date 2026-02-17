@@ -31,7 +31,7 @@ router.post('/signup', async (req, res) => {
     const userId = Date.now().toString()
     await dbRun(
       'INSERT INTO users (id, name, email, password, is_admin) VALUES (?, ?, ?, ?, ?)',
-      [userId, name, email, hashedPassword, 0]
+      [userId, name, email, hashedPassword, false]
     )
 
     const user = { id: userId, name, email, isAdmin: false }
@@ -69,7 +69,7 @@ router.post('/login', async (req, res) => {
       id: user.id, 
       name: user.name, 
       email: user.email,
-      isAdmin: user.is_admin === 1 
+      isAdmin: user.is_admin === true 
     }
     const token = generateToken(userData)
 

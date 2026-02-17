@@ -1,11 +1,23 @@
-# Netlify config: frontend only. Backend must be hosted separately (e.g. Render, Railway).
+# Netlify config: Full-stack deployment (frontend + backend functions)
 
 [build]
   command = "npm run build"
   publish = "dist"
   environment = { NODE_VERSION = "18" }
 
-# SPA: all routes serve index.html so React Router works
+# Functions configuration
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# API proxy: forward /api/* requests to the serverless function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+# SPA: all other routes serve index.html so React Router works
 [[redirects]]
   from = "/*"
   to = "/index.html"

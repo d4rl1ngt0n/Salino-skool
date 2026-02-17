@@ -18,7 +18,7 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      isAdmin: user.is_admin === 1,
+      isAdmin: user.is_admin === true,
       createdAt: user.created_at,
     })
   } catch (error) {

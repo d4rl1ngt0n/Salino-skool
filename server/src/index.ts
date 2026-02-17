@@ -1,21 +1,25 @@
+// Load environment variables from .env file (for local development)
+import { config } from 'dotenv'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+config({ path: resolve(__dirname, '../.env') })
+
 import express from 'express'
 import cors from 'cors'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { initDatabase } from './database/init.js'
 import authRoutes from './routes/auth.js'
 import courseRoutes from './routes/courses.js'
 import userRoutes from './routes/users.js'
 import resourcesRoutes from './routes/resources.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 const app = express()
 const PORT = process.env.PORT || 3001
 
-// Middleware – CORS first so preflight OPTIONS gets 2xx
-app.use(cors({ optionsSuccessStatus: 204 }))
+// CORS: allow all origins so frontend (Netlify, etc.) can reach API
+app.use(cors({ origin: true, optionsSuccessStatus: 204, credentials: false }))
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 

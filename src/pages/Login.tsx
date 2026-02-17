@@ -59,9 +59,13 @@ const Login = () => {
         </div>
         <div className="bg-white rounded-lg shadow-md p-8 border border-gray-200">
           {backendReachable === false && (
-            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-              <strong>Backend not reachable.</strong> Start it so login works:{' '}
-              <code className="mt-1 block bg-amber-100 px-2 py-1 rounded text-xs">cd server && npm run dev</code>
+            <div className="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm space-y-2">
+              <strong>Backend not reachable.</strong>
+              <ul className="list-disc list-inside text-xs space-y-1 mt-1">
+                <li><strong>Local:</strong> Run <code className="bg-amber-100 px-1 rounded">cd server && npm run dev</code></li>
+                <li><strong>Production:</strong> Set <code className="bg-amber-100 px-1 rounded">VITE_API_URL</code> in Netlify to your Render API URL + <code className="bg-amber-100 px-1 rounded">/api</code> (e.g. https://salino-api.onrender.com/api)</li>
+                <li><strong>Render free tier:</strong> Backend sleeps after ~15 min. First request can take 30–60 sec to wake up.</li>
+              </ul>
             </div>
           )}
           <form className="space-y-6" onSubmit={handleSubmit}>
