@@ -676,20 +676,28 @@ async function insertSampleData() {
   const existingCourseIds = new Set(existingCourses.map(c => c.id))
 
   let insertedCount = 0
+  let skippedCount = 0
+  let errorCount = 0
+  
+  console.log(`Starting to insert ${courses.length} courses. ${existingCourseIds.size} already exist.`)
+  
   for (const course of courses) {
     // Skip if course already exists
     if (existingCourseIds.has(course.id)) {
-      console.log(`Course ${course.id} already exists, skipping`)
+      console.log(`Course ${course.id} (${course.title}) already exists, skipping`)
+      skippedCount++
       continue
     }
 
     try {
+      console.log(`Inserting course ${course.id}: ${course.title} with ${course.lessons.length} lessons`)
+      
       await dbRun(
         'INSERT INTO courses (id, title, description, order_index) VALUES (?, ?, ?, ?)',
         [course.id, course.title, course.description, course.order]
       )
-      insertedCount++
-
+      
+      let lessonCount = 0
       for (const lesson of course.lessons) {
         // Add video URL placeholder for all lessons
         const videoUrl = `https://placeholder-video.com/${course.id}/${lesson.id}`
@@ -697,15 +705,35 @@ async function insertSampleData() {
           'INSERT INTO lessons (id, course_id, title, content, video_url, order_index) VALUES (?, ?, ?, ?, ?, ?)',
           [lesson.id, course.id, lesson.title, lesson.content, videoUrl, lesson.order]
         )
+        lessonCount++
       }
-      console.log(`Inserted course ${course.id}: ${course.title}`)
+      
+      insertedCount++
+      console.log(`✓ Successfully inserted course ${course.id}: ${course.title} with ${lessonCount} lessons`)
     } catch (error: any) {
-      console.error(`Error inserting course ${course.id}:`, error?.message)
-      // Continue with next course
+      errorCount++
+      console.error(`✗ Error inserting course ${course.id} (${course.title}):`, error?.message)
+      console.error('Error details:', {
+        code: error?.code,
+        errno: error?.errno,
+        stack: error?.stack?.substring(0, 200)
+      })
+      // Continue with next course - don't let one failure stop all
     }
   }
 
-  console.log(`Sample data insertion complete. Inserted ${insertedCount} new courses.`)
+  console.log(`Sample data insertion complete:`)
+  console.log(`  - Inserted: ${insertedCount} courses`)
+  console.log(`  - Skipped: ${skippedCount} courses (already exist)`)
+  console.log(`  - Errors: ${errorCount} courses`)
+  
+  // Verify final count
+  try {
+    const finalCount = await dbGet('SELECT COUNT(*) as count FROM courses') as any
+    console.log(`  - Total courses in database: ${finalCount?.count || 0}`)
+  } catch (e) {
+    console.error('Could not verify final course count:', e)
+  }
 }
 
 async function updateLessonsWithVideos() {
