@@ -93,21 +93,39 @@ const serverlessHandler = serverless(app, {
   binary: ['image/*', 'application/pdf', 'application/octet-stream']
 })
 
-// Wrap handler with database initialization (skip for health check)
+// Wrap handler with error handling and database initialization
 const wrappedHandler = async (event: any, context: any) => {
-  // Health check doesn't need database - respond immediately
-  if (event.path === '/api/health' || event.path === '/.netlify/functions/api/health') {
-    return serverlessHandler(event, context)
-  }
-  
-  // For other routes, ensure database is initialized
   try {
-    await ensureDatabaseInitialized()
-  } catch (error) {
-    console.error('Failed to initialize database:', error)
-    // Still try to handle the request, but log the error
+    // Health check doesn't need database - respond immediately
+    if (event.path === '/api/health' || event.path === '/.netlify/functions/api/health' || event.rawPath === '/api/health') {
+      return serverlessHandler(event, context)
+    }
+    
+    // For other routes, ensure database is initialized
+    try {
+      await ensureDatabaseInitialized()
+    } catch (error) {
+      console.error('Failed to initialize database:', error)
+      // Still try to handle the request, but log the error
+    }
+    
+    return await serverlessHandler(event, context)
+  } catch (error: any) {
+    console.error('Function handler error:', error)
+    console.error('Error stack:', error?.stack)
+    return {
+      statusCode: 500,
+      body: JSON.stringify({
+        error: 'Internal server error',
+        message: error?.message || 'Unknown error',
+        // Only include stack in development
+        ...(process.env.NETLIFY_DEV && { stack: error?.stack })
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
   }
-  return serverlessHandler(event, context)
 }
 
 // Export the serverless-wrapped Express app
