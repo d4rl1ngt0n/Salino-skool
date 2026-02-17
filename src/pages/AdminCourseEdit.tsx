@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useCourses } from '../context/CourseContext'
 import { api } from '../services/api'
@@ -14,7 +14,6 @@ interface LessonRow {
 
 const AdminCourseEdit = () => {
   const { courseId } = useParams<{ courseId: string }>()
-  const navigate = useNavigate()
   const { courses, refreshCourses } = useCourses()
   const [course, setCourse] = useState<{ id: string; title: string; description?: string; lessons: LessonRow[] } | null>(null)
   const [loading, setLoading] = useState(true)
