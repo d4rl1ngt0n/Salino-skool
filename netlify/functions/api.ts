@@ -51,11 +51,15 @@ async function ensureDatabaseInitialized() {
   dbInitPromise = (async () => {
     try {
       console.log('Initializing database...')
+      console.log('DATABASE_URL present:', !!process.env.DATABASE_URL)
       await initDatabase()
       console.log('Database initialized successfully')
       dbInitialized = true
-    } catch (error) {
+    } catch (error: any) {
       console.error('Database initialization error:', error)
+      console.error('Error message:', error?.message)
+      console.error('Error stack:', error?.stack)
+      // Don't throw - let routes handle the error
       throw error
     }
   })()
@@ -104,9 +108,26 @@ const wrappedHandler = async (event: any, context: any) => {
     // For other routes, ensure database is initialized
     try {
       await ensureDatabaseInitialized()
-    } catch (error) {
+      console.log('Database ready, handling request:', event.path)
+    } catch (error: any) {
       console.error('Failed to initialize database:', error)
-      // Still try to handle the request, but log the error
+      console.error('Error details:', {
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      })
+      // Return a proper error response instead of continuing
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: 'Database initialization failed',
+          message: error?.message || 'Unable to connect to database',
+          details: process.env.NETLIFY_DEV ? error?.stack : undefined
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     }
     
     return await serverlessHandler(event, context)
