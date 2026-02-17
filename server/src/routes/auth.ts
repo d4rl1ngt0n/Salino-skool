@@ -53,14 +53,41 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' })
     }
 
+    console.log('Login attempt for email:', email)
+
     // Find user
-    const user = await dbGet('SELECT * FROM users WHERE email = ?', [email]) as any
+    let user: any
+    try {
+      user = await dbGet('SELECT * FROM users WHERE email = ?', [email]) as any
+      console.log('User lookup result:', user ? 'Found' : 'Not found')
+    } catch (dbError: any) {
+      console.error('Database query error:', dbError)
+      console.error('Error details:', {
+        message: dbError?.message,
+        code: dbError?.code,
+        stack: dbError?.stack
+      })
+      return res.status(500).json({ 
+        error: 'Database error', 
+        message: dbError?.message || 'Failed to query database'
+      })
+    }
+
     if (!user) {
+      console.log('User not found for email:', email)
       return res.status(401).json({ error: 'Invalid credentials' })
     }
 
     // Verify password
-    const isValid = await bcrypt.compare(password, user.password)
+    let isValid = false
+    try {
+      isValid = await bcrypt.compare(password, user.password)
+      console.log('Password verification:', isValid ? 'Valid' : 'Invalid')
+    } catch (bcryptError: any) {
+      console.error('Password comparison error:', bcryptError)
+      return res.status(500).json({ error: 'Password verification failed' })
+    }
+
     if (!isValid) {
       return res.status(401).json({ error: 'Invalid credentials' })
     }
@@ -71,12 +98,25 @@ router.post('/login', async (req, res) => {
       email: user.email,
       isAdmin: user.is_admin === true 
     }
-    const token = generateToken(userData)
+    
+    let token: string
+    try {
+      token = generateToken(userData)
+      console.log('Token generated successfully')
+    } catch (tokenError: any) {
+      console.error('Token generation error:', tokenError)
+      console.error('JWT_SECRET present:', !!process.env.JWT_SECRET)
+      return res.status(500).json({ error: 'Token generation failed' })
+    }
 
     res.json({ user: userData, token })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Login error:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('Error stack:', error?.stack)
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error?.message || 'Unknown error'
+    })
   }
 })
 
