@@ -63,8 +63,8 @@ const Login = () => {
               <strong>Backend not reachable.</strong>
               <ul className="list-disc list-inside text-xs space-y-1 mt-1">
                 <li><strong>Local:</strong> Run <code className="bg-amber-100 px-1 rounded">cd server && npm run dev</code></li>
-                <li><strong>Production:</strong> Set <code className="bg-amber-100 px-1 rounded">VITE_API_URL</code> in Netlify to your Render API URL + <code className="bg-amber-100 px-1 rounded">/api</code> (e.g. https://salino-api.onrender.com/api)</li>
-                <li><strong>Render free tier:</strong> Backend sleeps after ~15 min. First request can take 30–60 sec to wake up.</li>
+                <li><strong>Production (Netlify):</strong> Check Netlify Functions logs. Ensure <code className="bg-amber-100 px-1 rounded">DATABASE_URL</code>, <code className="bg-amber-100 px-1 rounded">SUPABASE_URL</code>, <code className="bg-amber-100 px-1 rounded">SUPABASE_ANON_KEY</code>, and <code className="bg-amber-100 px-1 rounded">JWT_SECRET</code> are set in Netlify environment variables.</li>
+                <li><strong>Netlify Functions:</strong> First request may take 10–30 seconds (cold start). Check function logs in Netlify dashboard.</li>
               </ul>
             </div>
           )}

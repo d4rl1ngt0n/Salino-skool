@@ -5,17 +5,32 @@ import express from 'express'
 import cors from 'cors'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+
+// Load environment variables (Netlify provides these, but dotenv helps with local testing)
+import { config } from 'dotenv'
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+// Try to load .env from server directory (for local testing)
+try {
+  config({ path: path.resolve(__dirname, '../../server/.env') })
+} catch (e) {
+  // Ignore if .env doesn't exist (Netlify will use env vars from dashboard)
+}
+
 import { initDatabase } from '../../server/src/database/init.js'
 import authRoutes from '../../server/src/routes/auth.js'
 import courseRoutes from '../../server/src/routes/courses.js'
 import userRoutes from '../../server/src/routes/users.js'
 import resourcesRoutes from '../../server/src/routes/resources.js'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
 // Set NETLIFY env var so routes know we're in serverless mode
 process.env.NETLIFY = 'true'
+
+// Log environment status (for debugging)
+console.log('Netlify Function starting...')
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing')
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Missing')
 
 const app = express()
 
@@ -35,9 +50,25 @@ app.use('/api', (req, res, next) => {
 
 // Initialize database (runs once per cold start)
 let dbInitialized = false
-if (!dbInitialized) {
-  initDatabase().catch(console.error)
-  dbInitialized = true
+let dbInitPromise: Promise<void> | null = null
+
+async function ensureDatabaseInitialized() {
+  if (dbInitialized) return
+  if (dbInitPromise) return dbInitPromise
+  
+  dbInitPromise = (async () => {
+    try {
+      console.log('Initializing database...')
+      await initDatabase()
+      console.log('Database initialized successfully')
+      dbInitialized = true
+    } catch (error) {
+      console.error('Database initialization error:', error)
+      throw error
+    }
+  })()
+  
+  return dbInitPromise
 }
 
 // Routes
@@ -57,5 +88,19 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found', method: req.method, path: req.originalUrl })
 })
 
+// Create the serverless handler
+const serverlessHandler = serverless(app)
+
+// Wrap handler with database initialization
+const wrappedHandler = async (event: any, context: any) => {
+  try {
+    await ensureDatabaseInitialized()
+  } catch (error) {
+    console.error('Failed to initialize database:', error)
+    // Still try to handle the request, but log the error
+  }
+  return serverlessHandler(event, context)
+}
+
 // Export the serverless-wrapped Express app
-export const handler = serverless(app)
+export const handler = wrappedHandler
