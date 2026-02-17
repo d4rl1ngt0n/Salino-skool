@@ -2,9 +2,17 @@ import { Pool, QueryResult } from 'pg'
 import bcrypt from 'bcryptjs'
 
 // PostgreSQL connection pool (Supabase provides DATABASE_URL)
+// Clean up DATABASE_URL - remove any "VAR_NAME = " prefix if accidentally included
+let databaseUrl = process.env.DATABASE_URL || ''
+databaseUrl = databaseUrl.replace(/^DATABASE_URL\s*=\s*/i, '').trim()
+
+if (!databaseUrl) {
+  console.error('DATABASE_URL is not set!')
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+  connectionString: databaseUrl,
+  ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
 })
 
 pool.on('error', (err) => {

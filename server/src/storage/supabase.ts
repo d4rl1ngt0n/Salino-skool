@@ -8,8 +8,12 @@ let supabaseClient: ReturnType<typeof createClient> | null = null
 function getSupabaseClient() {
   if (supabaseClient) return supabaseClient
   
-  const supabaseUrl = process.env.SUPABASE_URL || ''
-  const supabaseKey = process.env.SUPABASE_ANON_KEY || ''
+  let supabaseUrl = process.env.SUPABASE_URL || ''
+  let supabaseKey = process.env.SUPABASE_ANON_KEY || ''
+
+  // Clean up env vars - remove any "VAR_NAME = " prefix if accidentally included
+  supabaseUrl = supabaseUrl.replace(/^SUPABASE_URL\s*=\s*/i, '').trim()
+  supabaseKey = supabaseKey.replace(/^SUPABASE_ANON_KEY\s*=\s*/i, '').trim()
 
   // Validate URL format before creating client
   if (!supabaseUrl || !supabaseKey) {
