@@ -114,15 +114,33 @@ const wrappedHandler = async (event: any, context: any) => {
       console.error('Error details:', {
         message: error?.message,
         code: error?.code,
+        errno: error?.errno,
+        syscall: error?.syscall,
+        hostname: error?.hostname,
         stack: error?.stack
       })
+      
+      // Provide helpful error message based on error type
+      let userMessage = 'Database connection failed'
+      if (error?.code === 'ENOTFOUND') {
+        userMessage = `Database host not found. Check DATABASE_URL format. Hostname: ${error?.hostname || 'unknown'}`
+      } else if (error?.code === 'ECONNREFUSED') {
+        userMessage = 'Database connection refused. Check DATABASE_URL and ensure database is accessible.'
+      } else if (error?.message?.includes('DATABASE_URL')) {
+        userMessage = error.message
+      }
+      
       // Return a proper error response instead of continuing
       return {
         statusCode: 500,
         body: JSON.stringify({
           error: 'Database initialization failed',
-          message: error?.message || 'Unable to connect to database',
-          details: process.env.NETLIFY_DEV ? error?.stack : undefined
+          message: userMessage,
+          details: process.env.NETLIFY_DEV ? {
+            originalError: error?.message,
+            code: error?.code,
+            stack: error?.stack
+          } : undefined
         }),
         headers: {
           'Content-Type': 'application/json'

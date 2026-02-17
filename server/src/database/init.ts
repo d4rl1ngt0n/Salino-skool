@@ -8,11 +8,23 @@ databaseUrl = databaseUrl.replace(/^DATABASE_URL\s*=\s*/i, '').trim()
 
 if (!databaseUrl) {
   console.error('DATABASE_URL is not set!')
+  throw new Error('DATABASE_URL environment variable is required')
 }
+
+// Validate DATABASE_URL format
+if (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgres://')) {
+  console.error('Invalid DATABASE_URL format. Should start with postgresql:// or postgres://')
+  console.error('Current value (first 50 chars):', databaseUrl.substring(0, 50))
+  throw new Error('Invalid DATABASE_URL format. Must start with postgresql://')
+}
+
+console.log('Connecting to database...')
+console.log('DATABASE_URL format check:', databaseUrl.substring(0, 20) + '...')
 
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
+  connectionTimeoutMillis: 10000, // 10 second timeout
 })
 
 pool.on('error', (err) => {
