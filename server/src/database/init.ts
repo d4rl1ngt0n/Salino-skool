@@ -45,13 +45,14 @@ function convertPlaceholders(sql: string): string {
   let converted = sql.replace(/\?/g, () => `$${paramIndex++}`)
   
   // Convert INSERT OR REPLACE to INSERT ... ON CONFLICT DO UPDATE
+  // Handle both simple and complex cases
   converted = converted.replace(
-    /INSERT OR REPLACE INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi,
+    /INSERT\s+OR\s+REPLACE\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi,
     (match, table, columns, values) => {
       // Extract primary key column (usually 'id')
       const pkCol = columns.split(',')[0].trim()
-      // Build UPDATE clause for all columns except the primary key
-      const updateCols = columns.split(',').slice(1).map((col: string) => {
+      // Build UPDATE clause for all columns
+      const updateCols = columns.split(',').map((col: string) => {
         const colName = col.trim()
         return `${colName} = EXCLUDED.${colName}`
       }).join(', ')
@@ -301,38 +302,84 @@ async function applyCourseStructuresOnce() {
   try {
     await dbRun('CREATE TABLE IF NOT EXISTS init_flags (name VARCHAR(255) PRIMARY KEY)')
     const existing = await dbGet("SELECT 1 FROM init_flags WHERE name = 'course_structures_applied'") as any
-    if (existing) {
-      return // Already applied; don't overwrite videos on every startup
-    }
-    // If there are already lessons with real video URLs (not placeholders), preserve them and just set the flag
-    const lessonsWithRealVideos = await dbAll(
-      `SELECT 1 FROM lessons WHERE video_url IS NOT NULL AND video_url != '' AND video_url NOT LIKE '%placeholder-video.com%' LIMIT 1`
-    ) as any[]
-    if (lessonsWithRealVideos.length > 0) {
-      await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO NOTHING")
-      console.log('Course structures already have real videos; skipping structure overwrite (DB is source of truth)')
+    
+    // Check if we have real videos (not placeholders) - count videos that are YouTube, Loom, or other real sources
+    const realVideoCheck = await dbGet(
+      `SELECT COUNT(*) as count FROM lessons 
+       WHERE video_url IS NOT NULL 
+       AND video_url != '' 
+       AND (video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%')`
+    ) as any
+    const realVideoCount = realVideoCheck?.count || 0
+    
+    // Check placeholder count
+    const placeholderCheck = await dbGet(
+      `SELECT COUNT(*) as count FROM lessons WHERE video_url LIKE '%placeholder-video.com%'`
+    ) as any
+    const placeholderCount = placeholderCheck?.count || 0
+    
+    // Check total lesson count
+    const totalLessons = await dbGet('SELECT COUNT(*) as count FROM lessons') as any
+    const lessonCount = totalLessons?.count || 0
+    
+    console.log(`Course structure check: ${realVideoCount} real videos, ${placeholderCount} placeholders, ${lessonCount} total lessons`)
+    
+    // If flag exists AND we have many real videos (>10), skip (preserve user edits)
+    if (existing && realVideoCount > 10) {
+      console.log('Course structures already applied with real videos; skipping to preserve user edits')
       return
     }
-    // New or placeholder-only DB: apply structure from code
+    
+    // If we have mostly placeholders, apply structures
+    if (placeholderCount > realVideoCount || realVideoCount === 0) {
+      console.log('Applying course structures with real video URLs (replacing placeholders)...')
+    }
+    
+    // Apply course structures (this will update videos and add missing lessons)
     await updateLessonsWithVideos()
     await updateSpecificLessonVideos()
-    await updateCourse1Structure()
-    await updateCourse2Structure()
-    await updateCourse3Structure()
-    await updateCourse4Structure()
-    await updateCourse5Structure()
-    await updateCourse6Structure()
-    await updateCourse7Structure()
-    await updateCourse8Structure()
-    await updateCourse9Structure()
-    await updateCourse10Structure()
-    await updateCourse11Structure()
-    await updateCourse12Structure()
-    await updateCourse13Structure()
-    await updateCourse14Structure()
-    await updateCourse15Structure()
-    await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO NOTHING")
-    console.log('Course structures applied once (real video URLs). Future restarts will not overwrite lesson videos.')
+    
+    const structureUpdates = [
+      updateCourse1Structure,
+      updateCourse2Structure,
+      updateCourse3Structure,
+      updateCourse4Structure,
+      updateCourse5Structure,
+      updateCourse6Structure,
+      updateCourse7Structure,
+      updateCourse8Structure,
+      updateCourse9Structure,
+      updateCourse10Structure,
+      updateCourse11Structure,
+      updateCourse12Structure,
+      updateCourse13Structure,
+      updateCourse14Structure,
+      updateCourse15Structure,
+    ]
+    
+    let successCount = 0
+    let errorCount = 0
+    
+    for (const updateFn of structureUpdates) {
+      try {
+        await updateFn()
+        successCount++
+        console.log(`✓ ${updateFn.name} completed`)
+      } catch (error: any) {
+        errorCount++
+        console.error(`✗ Error in ${updateFn.name}:`, error?.message)
+        console.error('Stack:', error?.stack?.substring(0, 300))
+      }
+    }
+    
+    await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO UPDATE SET name = 'course_structures_applied'")
+    console.log(`Course structures applied: ${successCount} successful, ${errorCount} errors`)
+    
+    // Verify final counts
+    const finalRealVideos = await dbGet(
+      `SELECT COUNT(*) as count FROM lessons WHERE video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%'`
+    ) as any
+    console.log(`Final count: ${finalRealVideos?.count || 0} lessons with real videos`)
   } catch (error) {
     console.error('Error in applyCourseStructuresOnce:', error)
   }
@@ -812,13 +859,17 @@ async function updateCourse1Structure() {
       },
     ]
 
-    // Delete existing lessons for course 1
-    await dbRun('DELETE FROM lessons WHERE course_id = ?', ['1'])
-    
-    // Insert updated lessons with actual video URLs
+    // Use INSERT ... ON CONFLICT to update existing lessons or insert new ones
+    // This preserves any user-edited videos that aren't being updated
     for (const lesson of course1Lessons) {
       await dbRun(
-        'INSERT OR REPLACE INTO lessons (id, course_id, title, content, video_url, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+        `INSERT INTO lessons (id, course_id, title, content, video_url, order_index) 
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           title = EXCLUDED.title,
+           content = EXCLUDED.content,
+           video_url = EXCLUDED.video_url,
+           order_index = EXCLUDED.order_index`,
         [lesson.id, '1', lesson.title, lesson.content, lesson.videoUrl, lesson.order]
       )
     }
@@ -856,13 +907,16 @@ async function updateCourse2Structure() {
       },
     ]
 
-    // Delete existing lessons for course 2
-    await dbRun('DELETE FROM lessons WHERE course_id = ?', ['2'])
-    
-    // Insert updated lessons
+    // Use INSERT ... ON CONFLICT to ensure all lessons are present with correct videos
     for (const lesson of course2Lessons) {
       await dbRun(
-        'INSERT OR REPLACE INTO lessons (id, course_id, title, content, video_url, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+        `INSERT INTO lessons (id, course_id, title, content, video_url, order_index) 
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT (id) DO UPDATE SET
+           title = EXCLUDED.title,
+           content = EXCLUDED.content,
+           video_url = EXCLUDED.video_url,
+           order_index = EXCLUDED.order_index`,
         [lesson.id, '2', lesson.title, lesson.content, lesson.videoUrl, lesson.order]
       )
     }
