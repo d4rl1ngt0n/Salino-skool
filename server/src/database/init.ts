@@ -177,20 +177,16 @@ export async function initDatabase() {
     throw error
   }
 
-  // Migrate existing databases to add is_admin column if it doesn't exist
-  migrateDatabase().catch(console.error)
-  // Migrate resources table to add saved_file_name column if it doesn't exist
-  migrateResourcesTable().catch(console.error)
-  // Migrate lessons table to add section column if it doesn't exist
-  migrateLessonsSection().catch(console.error)
-  // Migrate courses table to add thumbnail_url if it doesn't exist
-  migrateCoursesThumbnail().catch(console.error)
-  
-  // Insert sample courses and default user if they don't exist
-  insertSampleData().catch(console.error)
-  insertDefaultUser().catch(console.error)
-  // Apply course structures (real video URLs) only once, so we never overwrite user-edited videos on restart
-  applyCourseStructuresOnce().catch(console.error)
+  // Run migrations first so section/thumbnail columns exist before structure updates
+  await migrateDatabase().catch((e) => { console.error('migrateDatabase:', e) })
+  await migrateResourcesTable().catch((e) => { console.error('migrateResourcesTable:', e) })
+  await migrateLessonsSection().catch((e) => { console.error('migrateLessonsSection:', e) })
+  await migrateCoursesThumbnail().catch((e) => { console.error('migrateCoursesThumbnail:', e) })
+
+  // Insert sample courses first so all 15 courses exist, then apply full lesson lists and real videos
+  await insertSampleData().catch((e) => { console.error('insertSampleData:', e) })
+  await insertDefaultUser().catch((e) => { console.error('insertDefaultUser:', e) })
+  await applyCourseStructuresOnce().catch((e) => { console.error('applyCourseStructuresOnce:', e) })
 }
 
 async function migrateDatabase() {
@@ -301,38 +297,44 @@ async function migrateCoursesThumbnail() {
 async function applyCourseStructuresOnce() {
   try {
     await dbRun('CREATE TABLE IF NOT EXISTS init_flags (name VARCHAR(255) PRIMARY KEY)')
+    const forceApply = process.env.FORCE_COURSE_STRUCTURE === 'true' || process.env.FORCE_COURSE_STRUCTURE === '1'
+    if (forceApply) {
+      await dbRun("DELETE FROM init_flags WHERE name = 'course_structures_applied'")
+      console.log('FORCE_COURSE_STRUCTURE set: re-applying all course structures')
+    }
+
     const existing = await dbGet("SELECT 1 FROM init_flags WHERE name = 'course_structures_applied'") as any
-    
-    // Check if we have real videos (not placeholders) - count videos that are YouTube, Loom, or other real sources
+
+    // Check if we have real videos (not placeholders) - count videos that are YouTube, Loom, Skool, or other real sources
     const realVideoCheck = await dbGet(
       `SELECT COUNT(*) as count FROM lessons 
        WHERE video_url IS NOT NULL 
        AND video_url != '' 
-       AND (video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%')`
+       AND (video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%' OR video_url LIKE '%skool.com%' OR video_url LIKE '%files.skool.com%')`
     ) as any
-    const realVideoCount = realVideoCheck?.count || 0
-    
+    const realVideoCount = Number(realVideoCheck?.count ?? 0)
+
     // Check placeholder count
     const placeholderCheck = await dbGet(
       `SELECT COUNT(*) as count FROM lessons WHERE video_url LIKE '%placeholder-video.com%'`
     ) as any
-    const placeholderCount = placeholderCheck?.count || 0
-    
-    // Check total lesson count
+    const placeholderCount = Number(placeholderCheck?.count ?? 0)
+
+    // Total lesson count
     const totalLessons = await dbGet('SELECT COUNT(*) as count FROM lessons') as any
-    const lessonCount = totalLessons?.count || 0
-    
+    const lessonCount = Number(totalLessons?.count ?? 0)
+
     console.log(`Course structure check: ${realVideoCount} real videos, ${placeholderCount} placeholders, ${lessonCount} total lessons`)
-    
-    // If flag exists AND we have many real videos (>10), skip (preserve user edits)
-    if (existing && realVideoCount > 10) {
+
+    // If flag exists AND we have many real videos (>20), skip unless forced (preserve user edits)
+    if (!forceApply && existing && realVideoCount > 20) {
       console.log('Course structures already applied with real videos; skipping to preserve user edits')
       return
     }
-    
-    // If we have mostly placeholders, apply structures
-    if (placeholderCount > realVideoCount || realVideoCount === 0) {
-      console.log('Applying course structures with real video URLs (replacing placeholders)...')
+
+    // If we have placeholders or few real videos, apply structures
+    if (forceApply || placeholderCount > 0 || realVideoCount < 20) {
+      console.log('Applying course structures with real video URLs (replacing placeholders / filling missing lessons)...')
     }
     
     // Apply course structures (this will update videos and add missing lessons)
@@ -377,9 +379,10 @@ async function applyCourseStructuresOnce() {
     
     // Verify final counts
     const finalRealVideos = await dbGet(
-      `SELECT COUNT(*) as count FROM lessons WHERE video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%'`
+      `SELECT COUNT(*) as count FROM lessons WHERE video_url IS NOT NULL AND video_url != '' AND (video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%' OR video_url LIKE '%skool.com%')`
     ) as any
-    console.log(`Final count: ${finalRealVideos?.count || 0} lessons with real videos`)
+    const totalAfter = await dbGet('SELECT COUNT(*) as count FROM lessons') as any
+    console.log(`Final: ${finalRealVideos?.count ?? 0} lessons with real videos, ${totalAfter?.count ?? 0} total lessons`)
   } catch (error) {
     console.error('Error in applyCourseStructuresOnce:', error)
   }
@@ -1029,7 +1032,7 @@ async function updateCourse5Structure() {
 // Seed Creative Format Skool URLs as resources for Course 6 (lesson 6-2)
 async function seedCourse6CreativeFormatResources() {
   try {
-    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = 1 LIMIT 1')) as { id: string } | undefined
+    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = true LIMIT 1')) as { id: string } | undefined
     if (!adminUser) return
 
     const resources = [
@@ -1152,7 +1155,7 @@ async function updateCourse7Structure() {
 // Seed Creative Format Skool URLs as resources for Course 7 (lesson 7-6)
 async function seedCourse7CreativeFormatResources() {
   try {
-    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = 1 LIMIT 1')) as { id: string } | undefined
+    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = true LIMIT 1')) as { id: string } | undefined
     if (!adminUser) return
 
     const resources = [
@@ -1176,7 +1179,7 @@ async function seedCourse7CreativeFormatResources() {
 // Seed Creative Format Skool URL as resource for Course 8 (lesson 8-8)
 async function seedCourse8CreativeFormatResources() {
   try {
-    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = 1 LIMIT 1')) as { id: string } | undefined
+    const adminUser = (await dbGet('SELECT id FROM users WHERE is_admin = true LIMIT 1')) as { id: string } | undefined
     if (!adminUser) return
 
     const resources = [

@@ -52,11 +52,14 @@ class ApiClient {
       })
 
       let data
-      try {
-        data = await response.json()
-      } catch (e) {
-        // If response is not JSON, return error
-        return { error: `Server error: ${response.status} ${response.statusText}` }
+      if (response.status === 204) {
+        data = null
+      } else {
+        try {
+          data = await response.json()
+        } catch (e) {
+          return { error: `Server error: ${response.status} ${response.statusText}` }
+        }
       }
 
       if (!response.ok) {
@@ -209,7 +212,7 @@ class ApiClient {
     })
   }
 
-  // Admin endpoints for course management
+  // Admin endpoints for course and lesson management
   async updateLessonVideo(courseId: string, lessonId: string, videoUrl: string) {
     return this.request<any>(`/courses/${courseId}/lessons/${lessonId}/video`, {
       method: 'PUT',
@@ -217,10 +220,43 @@ class ApiClient {
     })
   }
 
-  async updateLesson(courseId: string, lessonId: string, data: { title?: string; content?: string; videoUrl?: string }) {
+  async updateLesson(
+    courseId: string,
+    lessonId: string,
+    data: {
+      title?: string
+      content?: string
+      videoUrl?: string
+      order_index?: number
+      section?: string | null
+    }
+  ) {
     return this.request<any>(`/courses/${courseId}/lessons/${lessonId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    })
+  }
+
+  async createLesson(
+    courseId: string,
+    data: {
+      title: string
+      content?: string
+      video_url?: string | null
+      order_index?: number
+      section?: string | null
+      id?: string
+    }
+  ) {
+    return this.request<any>(`/courses/${courseId}/lessons`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  }
+
+  async deleteLesson(courseId: string, lessonId: string) {
+    return this.request<void>(`/courses/${courseId}/lessons/${lessonId}`, {
+      method: 'DELETE',
     })
   }
 

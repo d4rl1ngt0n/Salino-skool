@@ -24,6 +24,7 @@ const Layout = ({ children }: LayoutProps) => {
     { path: '/members', label: 'Members' },
     { path: '/leaderboards', label: 'Leaderboards' },
     { path: '/about', label: 'About' },
+    ...(user ? [{ path: '/admin/courses', label: 'Manage courses' }] : []),
   ]
 
   return (

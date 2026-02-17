@@ -1,4 +1,5 @@
 import express from 'express'
+import { v4 as uuidv4 } from 'uuid'
 import { dbAll, dbGet, dbRun } from '../database/init.js'
 import { authenticateToken, AuthRequest } from '../middleware/auth.js'
 import { requireAdmin } from '../middleware/admin.js'
@@ -169,11 +170,11 @@ router.put('/:courseId/lessons/:lessonId/video', authenticateToken, requireAdmin
   }
 })
 
-// Update lesson content - Admin only
+// Update lesson content - Admin only (title, content, video_url, order_index, section)
 router.put('/:courseId/lessons/:lessonId', authenticateToken, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { courseId, lessonId } = req.params
-    const { title, content, videoUrl } = req.body
+    const { title, content, videoUrl, order_index, section } = req.body
 
     const updates: string[] = []
     const values: any[] = []
@@ -189,6 +190,14 @@ router.put('/:courseId/lessons/:lessonId', authenticateToken, requireAdmin, asyn
     if (videoUrl !== undefined) {
       updates.push('video_url = ?')
       values.push(videoUrl)
+    }
+    if (order_index !== undefined) {
+      updates.push('order_index = ?')
+      values.push(Number(order_index))
+    }
+    if (section !== undefined) {
+      updates.push('section = ?')
+      values.push(section === '' ? null : section)
     }
 
     if (updates.length === 0) {
@@ -209,6 +218,91 @@ router.put('/:courseId/lessons/:lessonId', authenticateToken, requireAdmin, asyn
     res.json(updatedLesson)
   } catch (error) {
     console.error('Update lesson error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Create lesson - Admin only
+router.post('/:courseId/lessons', authenticateToken, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { courseId } = req.params
+    const { title, content, video_url, order_index, section, id: suggestedId } = req.body
+
+    if (!title || title.trim() === '') {
+      return res.status(400).json({ error: 'title is required' })
+    }
+
+    const course = await dbGet('SELECT id FROM courses WHERE id = ?', [courseId]) as any
+    if (!course) {
+      return res.status(404).json({ error: 'Course not found' })
+    }
+
+    const order = order_index !== undefined ? Number(order_index) : null as number | null
+    let orderToUse: number
+    if (order !== null && !Number.isNaN(order)) {
+      orderToUse = order
+    } else {
+      const maxOrder = await dbGet(
+        'SELECT COALESCE(MAX(order_index), 0) as max_order FROM lessons WHERE course_id = ?',
+        [courseId]
+      ) as { max_order: number }
+      orderToUse = (maxOrder?.max_order ?? 0) + 1
+    }
+
+    const lessonId = suggestedId && typeof suggestedId === 'string' && suggestedId.trim() !== ''
+      ? suggestedId.trim()
+      : `${courseId}-${uuidv4().slice(0, 8)}`
+
+    const existing = await dbGet('SELECT id FROM lessons WHERE id = ?', [lessonId]) as any
+    if (existing) {
+      return res.status(400).json({ error: 'A lesson with this id already exists. Use a different id or leave blank to auto-generate.' })
+    }
+
+    await dbRun(
+      `INSERT INTO lessons (id, course_id, title, content, video_url, order_index, section)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        lessonId,
+        courseId,
+        title.trim(),
+        content != null ? String(content) : '',
+        video_url != null && video_url !== '' ? video_url : null,
+        orderToUse,
+        section != null && section !== '' ? section : null,
+      ]
+    )
+
+    const newLesson = await dbGet(
+      'SELECT * FROM lessons WHERE id = ? AND course_id = ?',
+      [lessonId, courseId]
+    ) as any
+
+    res.status(201).json(newLesson)
+  } catch (error) {
+    console.error('Create lesson error:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// Delete lesson - Admin only
+router.delete('/:courseId/lessons/:lessonId', authenticateToken, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { courseId, lessonId } = req.params
+
+    const lesson = await dbGet(
+      'SELECT id FROM lessons WHERE id = ? AND course_id = ?',
+      [lessonId, courseId]
+    ) as any
+
+    if (!lesson) {
+      return res.status(404).json({ error: 'Lesson not found' })
+    }
+
+    await dbRun('DELETE FROM lessons WHERE id = ? AND course_id = ?', [lessonId, courseId])
+
+    res.status(204).send()
+  } catch (error) {
+    console.error('Delete lesson error:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

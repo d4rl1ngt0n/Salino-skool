@@ -10,6 +10,7 @@ interface CourseContextType {
   markLessonIncomplete: (courseId: string, lessonId: string) => Promise<void>
   getCourseProgress: (courseId: string) => CourseProgress
   getLesson: (courseId: string, lessonId: string) => Lesson | undefined
+  refreshCourses: () => Promise<void>
   isLoading: boolean
 }
 
@@ -254,6 +255,11 @@ export const CourseProvider = ({ children }: CourseProviderProps) => {
     return course?.lessons.find((l) => l.id === lessonId)
   }
 
+  const refreshCourses = async () => {
+    await loadCourses()
+    if (user) await loadProgress()
+  }
+
   return (
     <CourseContext.Provider
       value={{
@@ -263,6 +269,7 @@ export const CourseProvider = ({ children }: CourseProviderProps) => {
         markLessonIncomplete,
         getCourseProgress,
         getLesson,
+        refreshCourses,
         isLoading,
       }}
     >

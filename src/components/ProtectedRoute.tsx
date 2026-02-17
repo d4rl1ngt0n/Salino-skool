@@ -4,9 +4,10 @@ import { ReactNode } from 'react'
 
 interface ProtectedRouteProps {
   children: ReactNode
+  requireAdmin?: boolean
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, requireAdmin }: ProtectedRouteProps) => {
   const { user, isLoading } = useAuth()
 
   if (isLoading) {
@@ -19,6 +20,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  if (requireAdmin && !user.isAdmin) {
+    return <Navigate to="/classroom" replace />
   }
 
   return <>{children}</>

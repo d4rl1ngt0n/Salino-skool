@@ -41,19 +41,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const storedUser = localStorage.getItem('user')
     
     if (token && storedUser) {
-      // Verify token is still valid by fetching user
+      try {
+        const parsed = JSON.parse(storedUser) as User
+        setUser(parsed)
+      } catch {
+        // ignore invalid stored user
+      }
       api.getCurrentUser().then((response) => {
         if (response.data) {
           setUser(response.data)
         } else {
-          // Token invalid, clear storage
           localStorage.removeItem('token')
           localStorage.removeItem('user')
+          setUser(null)
         }
         setIsLoading(false)
       }).catch(() => {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
+        setUser(null)
         setIsLoading(false)
       })
     } else {

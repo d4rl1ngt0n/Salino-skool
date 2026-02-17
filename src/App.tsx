@@ -14,6 +14,8 @@ import About from './pages/About'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Profile from './pages/Profile'
+import AdminCourses from './pages/AdminCourses'
+import AdminCourseEdit from './pages/AdminCourseEdit'
 
 function App() {
   return (
@@ -46,6 +48,22 @@ function App() {
                       element={
                         <ProtectedRoute>
                           <Profile />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/courses"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <AdminCourses />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin/courses/:courseId"
+                      element={
+                        <ProtectedRoute requireAdmin>
+                          <AdminCourseEdit />
                         </ProtectedRoute>
                       }
                     />

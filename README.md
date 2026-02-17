@@ -203,6 +203,7 @@ For the **backend** on Railway (same idea as Render):
      SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NjE2ODAwMCwiZXhwIjoxOTYxNzQ0MDAwfQ.example
      JWT_SECRET=my-super-secret-jwt-key-change-this-to-something-random-12345
      ```
+     - **Optional:** Set `FORCE_COURSE_STRUCTURE=true` once if courses still show placeholder videos or missing lessons; it re-applies all course structures and real video URLs, then you can remove it.
      
      **Note:** You don't need `VITE_API_URL` anymore! The frontend uses relative `/api` URLs that are automatically proxied to Netlify Functions.
    - Click **Deploy site**
@@ -314,3 +315,12 @@ src/
 - 🔄 Classroom with courses (Phase 3)
 - 🔄 Community feed (Phase 4)
 - 🔄 Additional features (Phase 5)
+
+
+
+postgresql://postgres:PoligyRulez2018@db.hwxjwjmlkuramaxpnksk.supabase.co:5432/postgres
+   SUPABASE_URL = https://hwxjwjmlkuramaxpnksk.supabase.co
+
+   SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh3eGp3am1sa3VyYW1heHBua3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzNDI5NTUsImV4cCI6MjA4NjkxODk1NX0.1N7K2sUVlXCTMgAR8h57sv6FiEdaNrnmpsgcfNF4zVM
+   
+   JWT_SECRET = zZ8I4Sk0z/yzVG0fKAkKufWfnhqteYluoKXjvhpbOtQ=
