@@ -1423,7 +1423,7 @@ async function insertDefaultUser() {
     if (existingUser) {
       // Update existing user to be admin if not already
       if (!existingUser.is_admin) {
-        await dbRun('UPDATE users SET is_admin = 1 WHERE email = ?', ['test@salino.com'])
+        await dbRun('UPDATE users SET is_admin = ? WHERE email = ?', [true, 'test@salino.com'])
         console.log('Updated default user to admin')
       }
       return
