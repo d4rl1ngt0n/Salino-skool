@@ -340,13 +340,20 @@ async function applyCourseStructuresOnce() {
 
 async function insertSampleData() {
   try {
-    const existingCourses = await dbGet('SELECT COUNT(*) as count FROM courses') as any
+    // Check if all 15 courses exist (not just if any exist)
+    const existingCourses = await dbAll('SELECT id FROM courses') as any[]
+    const existingCourseIds = new Set(existingCourses.map(c => c.id))
     
-    if (existingCourses && existingCourses.count > 0) {
-      return // Data already exists
+    // If all 15 courses exist, skip insertion
+    if (existingCourseIds.size >= 15) {
+      console.log('All courses already exist, skipping sample data insertion')
+      return
     }
+    
+    console.log(`Found ${existingCourseIds.size} existing courses, will insert missing ones`)
   } catch (error) {
     console.error('Error checking existing courses:', error)
+    // Continue anyway - might be first run
   }
 
   const courses = [
@@ -664,23 +671,41 @@ async function insertSampleData() {
     },
   ]
 
-  for (const course of courses) {
-    await dbRun(
-      'INSERT INTO courses (id, title, description, order_index) VALUES (?, ?, ?, ?)',
-      [course.id, course.title, course.description, course.order]
-    )
+  // Get existing course IDs to avoid duplicates
+  const existingCourses = await dbAll('SELECT id FROM courses').catch(() => []) as any[]
+  const existingCourseIds = new Set(existingCourses.map(c => c.id))
 
-    for (const lesson of course.lessons) {
-      // Add video URL placeholder for all lessons
-      const videoUrl = `https://placeholder-video.com/${course.id}/${lesson.id}`
+  let insertedCount = 0
+  for (const course of courses) {
+    // Skip if course already exists
+    if (existingCourseIds.has(course.id)) {
+      console.log(`Course ${course.id} already exists, skipping`)
+      continue
+    }
+
+    try {
       await dbRun(
-        'INSERT INTO lessons (id, course_id, title, content, video_url, order_index) VALUES (?, ?, ?, ?, ?, ?)',
-        [lesson.id, course.id, lesson.title, lesson.content, videoUrl, lesson.order]
+        'INSERT INTO courses (id, title, description, order_index) VALUES (?, ?, ?, ?)',
+        [course.id, course.title, course.description, course.order]
       )
+      insertedCount++
+
+      for (const lesson of course.lessons) {
+        // Add video URL placeholder for all lessons
+        const videoUrl = `https://placeholder-video.com/${course.id}/${lesson.id}`
+        await dbRun(
+          'INSERT INTO lessons (id, course_id, title, content, video_url, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+          [lesson.id, course.id, lesson.title, lesson.content, videoUrl, lesson.order]
+        )
+      }
+      console.log(`Inserted course ${course.id}: ${course.title}`)
+    } catch (error: any) {
+      console.error(`Error inserting course ${course.id}:`, error?.message)
+      // Continue with next course
     }
   }
 
-  console.log('Sample data inserted')
+  console.log(`Sample data insertion complete. Inserted ${insertedCount} new courses.`)
 }
 
 async function updateLessonsWithVideos() {
