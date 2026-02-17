@@ -75,7 +75,7 @@ class ApiClient {
         const isProd = apiUrl.includes('onrender.com') || apiUrl.includes('netlify')
         return {
           error: isProd
-            ? 'Cannot reach the API. The backend may be waking up (Render free tier sleeps after ~15 min). Try again in 30 sec, or check VITE_API_URL in your build env.'
+            ? 'Cannot reach the API. Netlify Functions may be cold starting (first request can take 10-30 sec). Try again in 30 sec, or check Netlify Functions logs.'
             : 'Cannot connect to server. Make sure the backend is running (e.g. npm run dev in the server folder).',
         }
       }
