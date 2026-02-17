@@ -3,20 +3,9 @@
 import serverless from 'serverless-http'
 import express from 'express'
 import cors from 'cors'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { dirname } from 'path'
 
-// Load environment variables (Netlify provides these, but dotenv helps with local testing)
-import { config } from 'dotenv'
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-// Try to load .env from server directory (for local testing)
-try {
-  config({ path: path.resolve(__dirname, '../../server/.env') })
-} catch (e) {
-  // Ignore if .env doesn't exist (Netlify will use env vars from dashboard)
-}
+// Note: Environment variables are provided by Netlify via process.env
+// No need for dotenv - Netlify automatically injects env vars from dashboard
 
 import { initDatabase } from '../../server/src/database/init.js'
 import authRoutes from '../../server/src/routes/auth.js'
@@ -27,10 +16,11 @@ import resourcesRoutes from '../../server/src/routes/resources.js'
 // Set NETLIFY env var so routes know we're in serverless mode
 process.env.NETLIFY = 'true'
 
-// Log environment status (for debugging)
+// Log environment status (for debugging) - only log if vars are set to avoid exposing values
 console.log('Netlify Function starting...')
-console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Missing')
-console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set' : 'Missing')
+console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set ✓' : 'Missing ✗')
+console.log('SUPABASE_URL:', process.env.SUPABASE_URL ? 'Set ✓' : 'Missing ✗')
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? 'Set ✓' : 'Missing ✗')
 
 const app = express()
 
