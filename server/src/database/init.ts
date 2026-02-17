@@ -19,12 +19,15 @@ if (!databaseUrl.startsWith('postgresql://') && !databaseUrl.startsWith('postgre
 }
 
 console.log('Connecting to database...')
-console.log('DATABASE_URL format check:', databaseUrl.substring(0, 20) + '...')
+console.log('DATABASE_URL format check:', databaseUrl.substring(0, 50) + '...')
+console.log('DATABASE_URL hostname:', databaseUrl.match(/@([^:]+)/)?.[1] || 'unknown')
 
 const pool = new Pool({
   connectionString: databaseUrl,
   ssl: databaseUrl.includes('supabase') ? { rejectUnauthorized: false } : undefined,
-  connectionTimeoutMillis: 10000, // 10 second timeout
+  connectionTimeoutMillis: 30000, // 30 second timeout (longer for cold starts)
+  idleTimeoutMillis: 30000,
+  max: 2, // Limit connections for serverless
 })
 
 pool.on('error', (err) => {
