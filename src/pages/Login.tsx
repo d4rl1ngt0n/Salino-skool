@@ -13,11 +13,29 @@ const Login = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const base = getApiBaseUrl()
-    fetch(`${base}/health`)
-      .then((r) => r.ok)
-      .then(setBackendReachable)
-      .catch(() => setBackendReachable(false))
+    const checkBackend = async () => {
+      try {
+        const base = getApiBaseUrl()
+        const response = await fetch(`${base}/health`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          console.log('Backend health check:', data)
+          setBackendReachable(true)
+        } else {
+          console.error('Backend health check failed:', response.status, response.statusText)
+          setBackendReachable(false)
+        }
+      } catch (error) {
+        console.error('Backend health check error:', error)
+        setBackendReachable(false)
+      }
+    }
+    checkBackend()
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -67,9 +67,17 @@ app.use('/api/courses', courseRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/resources', resourcesRoutes)
 
-// Health check
+// Health check - NO database initialization needed, respond immediately
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Salino GmbH API is running' })
+  res.json({ 
+    status: 'ok', 
+    message: 'Salino GmbH API is running',
+    env: {
+      database: process.env.DATABASE_URL ? 'configured' : 'missing',
+      supabase: process.env.SUPABASE_URL ? 'configured' : 'missing',
+      jwt: process.env.JWT_SECRET ? 'configured' : 'missing'
+    }
+  })
 })
 
 // 404 handler
@@ -79,10 +87,18 @@ app.use((req, res) => {
 })
 
 // Create the serverless handler
-const serverlessHandler = serverless(app)
+const serverlessHandler = serverless(app, {
+  binary: ['image/*', 'application/pdf', 'application/octet-stream']
+})
 
-// Wrap handler with database initialization
+// Wrap handler with database initialization (skip for health check)
 const wrappedHandler = async (event: any, context: any) => {
+  // Health check doesn't need database - respond immediately
+  if (event.path === '/api/health' || event.path === '/.netlify/functions/api/health') {
+    return serverlessHandler(event, context)
+  }
+  
+  // For other routes, ensure database is initialized
   try {
     await ensureDatabaseInitialized()
   } catch (error) {
