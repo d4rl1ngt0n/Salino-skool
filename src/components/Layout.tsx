@@ -28,17 +28,17 @@ const Layout = ({ children }: LayoutProps) => {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-w-0">
+          <div className="flex items-center justify-between h-16 gap-2 min-w-0">
             {/* Logo */}
-            <Link to="/" className="flex items-center group">
+            <Link to="/" className="flex items-center group flex-shrink-0 min-w-0 overflow-hidden">
               <img
                 src={logoUrl}
                 alt="Salino"
-                className="h-10 w-auto object-contain group-hover:opacity-90 transition-opacity"
+                className="h-8 sm:h-10 w-auto max-h-10 object-contain object-left group-hover:opacity-90 transition-opacity"
               />
             </Link>
 
@@ -67,7 +67,7 @@ const Layout = ({ children }: LayoutProps) => {
             </div>
 
             {/* User Actions */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               {user ? (
                 <>
                   <Link
@@ -106,15 +106,15 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="bg-white border-t border-gray-200">
+        {/* Navigation - scrollable on mobile so all links visible without truncation */}
+        <nav className="bg-white border-t border-gray-200 overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex space-x-1">
+            <div className="flex space-x-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent -mx-4 px-4 sm:mx-0 sm:px-0" style={{ scrollbarWidth: 'thin', WebkitOverflowScrolling: 'touch' }}>
               {navLinks.map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
-                  className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 ${
+                  className={`flex-shrink-0 px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                     location.pathname === link.path
                       ? 'text-indigo-600 border-indigo-600'
                       : 'text-gray-600 border-transparent hover:text-gray-900 hover:border-gray-300'
@@ -128,8 +128,8 @@ const Layout = ({ children }: LayoutProps) => {
         </nav>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Main Content - prevent horizontal overflow on mobile */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 w-full min-w-0 overflow-x-hidden">
         {children}
       </main>
     </div>

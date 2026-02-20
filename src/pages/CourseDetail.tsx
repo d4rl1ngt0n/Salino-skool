@@ -359,9 +359,9 @@ const CourseDetail = () => {
   const nextLesson = currentIndex >= 0 && course && course.lessons && Array.isArray(course.lessons) && currentIndex < course.lessons.length - 1 ? course.lessons[currentIndex + 1] : null
 
   return (
-    <div className="flex border border-gray-200 rounded-lg overflow-hidden" style={{ height: 'calc(100vh - 14rem)' }}>
-      {/* Left Sidebar */}
-      <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col overflow-hidden">
+    <div className="flex flex-col lg:flex-row border border-gray-200 rounded-lg overflow-hidden min-w-0 lg:h-[calc(100vh-14rem)]">
+      {/* Left Sidebar - full width on mobile, fixed width on desktop; scrollable on mobile */}
+      <div className="w-full lg:w-80 flex-shrink-0 bg-gray-50 border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col overflow-hidden max-h-[45vh] lg:max-h-none">
         {/* Course Header */}
         <div className="p-6 border-b border-gray-200">
           <Link
@@ -530,15 +530,15 @@ const CourseDetail = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto bg-white">
+      {/* Main Content Area - min-w-0 so it can shrink on small screens */}
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-white">
         {selectedLesson ? (
-          <div className="max-w-4xl mx-auto p-8">
+          <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
             {/* Lesson Header */}
             <div className="mb-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 break-words">
                     {selectedLesson.title}
                   </h1>
                   <p className="text-gray-600 text-sm">
@@ -547,7 +547,7 @@ const CourseDetail = () => {
                 </div>
                 <button
                   onClick={handleToggleComplete}
-                  className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg font-medium transition-all text-sm ${
                     isLessonCompleted
                       ? 'bg-green-100 text-green-700 hover:bg-green-200'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -610,10 +610,10 @@ const CourseDetail = () => {
                     </button>
                   </div>
                 )}
-                <div className="bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+                <div className="bg-gray-900 rounded-lg overflow-hidden shadow-lg max-w-full w-full">
                   {selectedLesson.videoUrl && selectedLesson.videoUrl.includes('loom.com/share/') ? (
                     // Loom share link - use embed
-                    <div className="aspect-video">
+                    <div className="aspect-video w-full max-w-full">
                       <iframe
                         className="w-full h-full rounded-lg"
                         src={selectedLesson.videoUrl.replace('loom.com/share/', 'loom.com/embed/')}
@@ -692,14 +692,14 @@ const CourseDetail = () => {
             )}
 
             {/* Lesson Content */}
-            <div className="prose max-w-none">
+            <div className="prose max-w-none min-w-0">
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Lesson Content</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">Lesson Content</h2>
                   {user?.isAdmin && (
                     <button
                       onClick={handleEditLesson}
-                      className="px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg font-medium transition-colors"
+                      className="flex-shrink-0 px-3 py-1.5 text-sm text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg font-medium transition-colors"
                     >
                       Edit Lesson
                     </button>
@@ -713,9 +713,9 @@ const CourseDetail = () => {
 
             {/* Resources Section - Visible to all users, upload only for admins */}
             <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900">Course Resources</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-bold text-gray-900">Course Resources</h2>
                   <p className="text-sm text-gray-600 mt-1">
                     Documents and files for this course
                     {selectedLessonId && ' • ' + (course?.lessons.find(l => l.id === selectedLessonId)?.title || 'Current lesson')}
