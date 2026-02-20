@@ -115,7 +115,11 @@ const CourseDetail = () => {
   // When selected lesson changes, scroll main content to top (must be before any early return to satisfy Rules of Hooks)
   useEffect(() => {
     if (selectedLessonId && mainContentRef.current) {
-      mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+      // Wait for React to finish rendering the new lesson content before scrolling
+      const timeoutId = setTimeout(() => {
+        mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      }, 100)
+      return () => clearTimeout(timeoutId)
     }
   }, [selectedLessonId])
 
@@ -318,9 +322,6 @@ const CourseDetail = () => {
     setSelectedLessonId(lessonId)
     navigate(`/classroom/${courseId}/lesson/${lessonId}`, { replace: true })
     // Scroll is handled by useEffect when selectedLessonId updates
-    requestAnimationFrame(() => {
-      mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-    })
   }
 
   const toggleSection = (section: string) => {
