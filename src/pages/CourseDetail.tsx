@@ -3,7 +3,7 @@ import { useCourses } from '../context/CourseContext'
 import { useAuth } from '../context/AuthContext'
 import { api, getApiOrigin } from '../services/api'
 import { TitleThumbnail } from '../components/TitleThumbnail'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Resource {
   id: string
@@ -48,6 +48,7 @@ const CourseDetail = () => {
     content: '',
     videoUrl: '',
   })
+  const mainContentRef = useRef<HTMLDivElement>(null)
 
   const course = courseId ? courses.find((c) => c.id === courseId) : undefined
 
@@ -309,7 +310,18 @@ const CourseDetail = () => {
   const handleLessonClick = (lessonId: string) => {
     setSelectedLessonId(lessonId)
     navigate(`/classroom/${courseId}/lesson/${lessonId}`, { replace: true })
+    // Scroll main content to top so user sees the video and lesson title
+    requestAnimationFrame(() => {
+      mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    })
   }
+
+  // When selected lesson changes (e.g. from URL), scroll main content to top
+  useEffect(() => {
+    if (selectedLessonId) {
+      mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [selectedLessonId])
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -411,8 +423,8 @@ const CourseDetail = () => {
         </div>
       </div>
 
-      {/* Main Content Area - min-w-0 so it can shrink on small screens */}
-      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-white">
+      {/* Main Content Area - min-w-0 so it can shrink on small screens; ref for scroll-to-top on lesson change */}
+      <div ref={mainContentRef} className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-white">
         {selectedLesson ? (
           <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
             {/* Lesson Header */}
