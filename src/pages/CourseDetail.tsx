@@ -362,44 +362,44 @@ const CourseDetail = () => {
     <div className="flex flex-col lg:flex-row border border-gray-200 rounded-lg overflow-hidden min-w-0 lg:h-[calc(100vh-14rem)]">
       {/* Left Sidebar - full width on mobile, fixed width on desktop; scrollable on mobile */}
       <div className="w-full lg:w-80 flex-shrink-0 bg-gray-50 border-b lg:border-b-0 lg:border-r border-gray-200 flex flex-col overflow-hidden max-h-[45vh] lg:max-h-none">
-        {/* Course Header */}
-        <div className="p-6 border-b border-gray-200">
+        {/* Course Header - compact on mobile for a smaller, more professional card */}
+        <div className="p-3 sm:p-4 lg:p-6 border-b border-gray-200">
           <Link
             to="/classroom"
-            className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-700 text-sm font-medium mb-4 transition-colors"
+            className="inline-flex items-center space-x-1 text-indigo-600 hover:text-indigo-700 text-xs sm:text-sm font-medium mb-2 sm:mb-4 transition-colors"
           >
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             <span>Back to Classroom</span>
           </Link>
-          {/* Course thumbnail: card style with topic + subtitle */}
-          <div className="aspect-video w-full rounded-lg overflow-hidden mb-3 border border-gray-200">
+          {/* Course thumbnail - shorter on mobile to save space */}
+          <div className="aspect-[3/2] lg:aspect-video w-full max-h-20 sm:max-h-28 lg:max-h-none rounded-lg overflow-hidden mb-2 sm:mb-3 border border-gray-200">
             <TitleThumbnail
               variant="card"
               title={course.lessons?.length ? course.lessons[0].title : course.title}
               subtitle="Salino GmbH - SOP Library"
-              className="w-full h-full rounded-lg"
+              className="w-full h-full rounded-lg object-cover"
             />
           </div>
-          <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-3 leading-tight">
+          <h1 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 mb-1 sm:mb-3 leading-tight line-clamp-2">
             {course.title}
           </h1>
           {course.description && (
-            <p className="text-sm text-gray-600 mb-4">{course.description}</p>
+            <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-4 line-clamp-2">{course.description}</p>
           )}
           
           {/* Progress Bar */}
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-gray-600">Progress</span>
-              <span className={`text-sm font-bold ${
+          <div className="mb-1 sm:mb-2">
+            <div className="flex items-center justify-between mb-0.5 sm:mb-1.5">
+              <span className="text-[10px] sm:text-xs font-medium text-gray-600">Progress</span>
+              <span className={`text-xs sm:text-sm font-bold ${
                 courseProgress.percentage === 100 ? 'text-green-600' : 'text-indigo-600'
               }`}>
                 {courseProgress.percentage}%
               </span>
             </div>
-            <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="relative h-1.5 sm:h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-300 ${
                   courseProgress.percentage === 100 ? 'bg-green-500' : 'bg-indigo-600'
@@ -411,9 +411,9 @@ const CourseDetail = () => {
         </div>
 
         {/* Lessons List */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-2">
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <div className="p-2 sm:p-4">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 sm:mb-3 px-2">
               Lessons
             </h2>
             <div className="space-y-1">
@@ -538,7 +538,7 @@ const CourseDetail = () => {
             <div className="mb-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 mb-2 break-words">
+                  <h1 className="text-base sm:text-xl lg:text-2xl font-bold text-gray-900 mb-2 break-words">
                     {selectedLesson.title}
                   </h1>
                   <p className="text-gray-600 text-sm">
