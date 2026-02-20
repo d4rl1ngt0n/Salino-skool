@@ -112,6 +112,13 @@ const CourseDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, selectedLessonId, user])
 
+  // When selected lesson changes, scroll main content to top (must be before any early return to satisfy Rules of Hooks)
+  useEffect(() => {
+    if (selectedLessonId && mainContentRef.current) {
+      mainContentRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [selectedLessonId])
+
   // Show loading state while data is being fetched (AFTER all hooks)
   if (isLoading || authLoading) {
     return (
@@ -310,18 +317,11 @@ const CourseDetail = () => {
   const handleLessonClick = (lessonId: string) => {
     setSelectedLessonId(lessonId)
     navigate(`/classroom/${courseId}/lesson/${lessonId}`, { replace: true })
-    // Scroll main content to top so user sees the video and lesson title
+    // Scroll is handled by useEffect when selectedLessonId updates
     requestAnimationFrame(() => {
       mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
     })
   }
-
-  // When selected lesson changes (e.g. from URL), scroll main content to top
-  useEffect(() => {
-    if (selectedLessonId) {
-      mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  }, [selectedLessonId])
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
