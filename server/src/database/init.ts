@@ -305,36 +305,16 @@ async function applyCourseStructuresOnce() {
 
     const existing = await dbGet("SELECT 1 FROM init_flags WHERE name = 'course_structures_applied'") as any
 
-    // Check if we have real videos (not placeholders) - count videos that are YouTube, Loom, Skool, or other real sources
-    const realVideoCheck = await dbGet(
-      `SELECT COUNT(*) as count FROM lessons 
-       WHERE video_url IS NOT NULL 
-       AND video_url != '' 
-       AND (video_url LIKE '%youtu.be%' OR video_url LIKE '%youtube.com%' OR video_url LIKE '%loom.com%' OR video_url LIKE '%cdn.loom.com%' OR video_url LIKE '%skool.com%' OR video_url LIKE '%files.skool.com%')`
-    ) as any
-    const realVideoCount = Number(realVideoCheck?.count ?? 0)
-
-    // Check placeholder count
-    const placeholderCheck = await dbGet(
-      `SELECT COUNT(*) as count FROM lessons WHERE video_url LIKE '%placeholder-video.com%'`
-    ) as any
-    const placeholderCount = Number(placeholderCheck?.count ?? 0)
-
-    // Total lesson count
-    const totalLessons = await dbGet('SELECT COUNT(*) as count FROM lessons') as any
-    const lessonCount = Number(totalLessons?.count ?? 0)
-
-    console.log(`Course structure check: ${realVideoCount} real videos, ${placeholderCount} placeholders, ${lessonCount} total lessons`)
-
-    // If flag exists AND we have many real videos (>20), skip unless forced (preserve user edits)
-    if (!forceApply && existing && realVideoCount > 20) {
-      console.log('Course structures already applied with real videos; skipping to preserve user edits')
+    // Once the flag is set, the DB is the source of truth. Never overwrite user edits unless FORCE_COURSE_STRUCTURE is set.
+    if (!forceApply && existing) {
+      console.log('Course structures already applied; skipping to preserve user edits (DB is source of truth)')
       return
     }
 
-    // If we have placeholders or few real videos, apply structures
-    if (forceApply || placeholderCount > 0 || realVideoCount < 20) {
-      console.log('Applying course structures with real video URLs (replacing placeholders / filling missing lessons)...')
+    if (forceApply) {
+      console.log('FORCE_COURSE_STRUCTURE: re-applying all course structures from code')
+    } else {
+      console.log('First run: applying course structures with default video URLs...')
     }
     
     // Apply course structures (this will update videos and add missing lessons)
