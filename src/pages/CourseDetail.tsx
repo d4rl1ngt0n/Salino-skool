@@ -538,7 +538,7 @@ const CourseDetail = () => {
             <div className="mb-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 break-words">
+                  <h1 className="text-base sm:text-xl lg:text-2xl font-bold text-gray-900 mb-2 break-words">
                     {selectedLesson.title}
                   </h1>
                   <p className="text-gray-600 text-sm">
@@ -688,6 +688,131 @@ const CourseDetail = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* All lessons below video - jump to any lesson; collapsible by section */}
+            {course?.lessons && course.lessons.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">
+                  Lessons in this course
+                </h2>
+                {sectionGroups ? (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    {sectionGroups.map(({ section, lessons }) => {
+                      const sectionLabel = section === '__none__' ? null : section
+                      const isExpanded = sectionLabel ? expandedSections.has(sectionLabel) : true
+                      return (
+                        <div key={section} className="border-b border-gray-200 last:border-b-0">
+                          {sectionLabel ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => toggleSection(sectionLabel)}
+                                className="w-full flex items-center justify-between px-4 py-3 text-left text-sm font-semibold text-gray-800 bg-white hover:bg-gray-50 border-b border-gray-100"
+                              >
+                                <span>{sectionLabel}</span>
+                                <svg
+                                  className={`h-4 w-4 text-gray-500 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                              {isExpanded && (
+                                <div className="bg-gray-50/80">
+                                  {lessons.map((lesson) => {
+                                    const isCompleted = courseProgress.lessonProgress[lesson.id] === true
+                                    const isCurrent = selectedLessonId === lesson.id
+                                    return (
+                                      <button
+                                        key={lesson.id}
+                                        type="button"
+                                        onClick={() => handleLessonClick(lesson.id)}
+                                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                                          isCurrent ? 'bg-indigo-100 text-indigo-900 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {isCompleted ? (
+                                          <span className="flex-shrink-0 h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                                            <svg className="h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          </span>
+                                        ) : (
+                                          <span className="flex-shrink-0 h-5 w-5 rounded-full border-2 border-gray-300" />
+                                        )}
+                                        <span className="flex-1 min-w-0 truncate">{lesson.title}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="bg-gray-50/80">
+                              {lessons.map((lesson) => {
+                                const isCompleted = courseProgress.lessonProgress[lesson.id] === true
+                                const isCurrent = selectedLessonId === lesson.id
+                                return (
+                                  <button
+                                    key={lesson.id}
+                                    type="button"
+                                    onClick={() => handleLessonClick(lesson.id)}
+                                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors ${
+                                      isCurrent ? 'bg-indigo-100 text-indigo-900 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                                    }`}
+                                  >
+                                    {isCompleted ? (
+                                      <span className="flex-shrink-0 h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                                        <svg className="h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </span>
+                                    ) : (
+                                      <span className="flex-shrink-0 h-5 w-5 rounded-full border-2 border-gray-300" />
+                                    )}
+                                    <span className="flex-1 min-w-0 truncate">{lesson.title}</span>
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                    {course.lessons.map((lesson) => {
+                      const isCompleted = courseProgress.lessonProgress[lesson.id] === true
+                      const isCurrent = selectedLessonId === lesson.id
+                      return (
+                        <button
+                          key={lesson.id}
+                          type="button"
+                          onClick={() => handleLessonClick(lesson.id)}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors border-b border-gray-100 last:border-b-0 ${
+                            isCurrent ? 'bg-indigo-100 text-indigo-900 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {isCompleted ? (
+                            <span className="flex-shrink-0 h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
+                              <svg className="h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            </span>
+                          ) : (
+                            <span className="flex-shrink-0 h-5 w-5 rounded-full border-2 border-gray-300" />
+                          )}
+                          <span className="flex-1 min-w-0 truncate">{lesson.title}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
