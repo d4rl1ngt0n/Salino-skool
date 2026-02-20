@@ -49,7 +49,7 @@ export function TitleThumbnail({
         className={`bg-gray-50 flex flex-col items-center justify-center overflow-hidden border-b border-gray-200 ${className}`}
         title={safeTitle}
       >
-        <p className="text-gray-900 font-bold text-center px-4 py-6 text-lg sm:text-xl uppercase tracking-tight leading-tight line-clamp-2">
+        <p className="text-gray-900 font-bold text-center px-4 py-4 sm:py-6 text-sm sm:text-base lg:text-lg uppercase tracking-tight leading-tight line-clamp-2">
           {displayText}
         </p>
         {subtitle && (

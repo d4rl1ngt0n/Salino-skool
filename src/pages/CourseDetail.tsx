@@ -382,7 +382,7 @@ const CourseDetail = () => {
               className="w-full h-full rounded-lg"
             />
           </div>
-          <h1 className="text-lg font-bold text-gray-900 mb-3 leading-tight">
+          <h1 className="text-base sm:text-lg font-bold text-gray-900 mb-3 leading-tight">
             {course.title}
           </h1>
           {course.description && (
@@ -538,7 +538,7 @@ const CourseDetail = () => {
             <div className="mb-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
                 <div className="flex-1 min-w-0">
-                  <h1 className="text-base sm:text-xl lg:text-2xl font-bold text-gray-900 mb-2 break-words">
+                  <h1 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 mb-2 break-words">
                     {selectedLesson.title}
                   </h1>
                   <p className="text-gray-600 text-sm">
