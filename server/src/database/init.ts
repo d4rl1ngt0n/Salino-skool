@@ -304,17 +304,25 @@ async function applyCourseStructuresOnce() {
     }
 
     const existing = await dbGet("SELECT 1 FROM init_flags WHERE name = 'course_structures_applied'") as any
+    const lessonCountResult = await dbGet('SELECT COUNT(*) as count FROM lessons') as { count: string } | undefined
+    const totalLessons = Number(lessonCountResult?.count ?? 0)
 
-    // Once the flag is set, the DB is the source of truth. Never overwrite user edits unless FORCE_COURSE_STRUCTURE is set.
+    // Never overwrite user edits: only run structure updates when (1) FORCE is set, or (2) first-time empty DB (no lessons yet).
     if (!forceApply && existing) {
       console.log('Course structures already applied; skipping to preserve user edits (DB is source of truth)')
+      return
+    }
+    if (!forceApply && totalLessons > 0) {
+      // DB already has lessons (e.g. user edits). Set flag and never overwrite.
+      await dbRun("INSERT INTO init_flags (name) VALUES ('course_structures_applied') ON CONFLICT (name) DO NOTHING")
+      console.log('DB already has lessons; setting flag and skipping structure overwrite to preserve user edits')
       return
     }
 
     if (forceApply) {
       console.log('FORCE_COURSE_STRUCTURE: re-applying all course structures from code')
     } else {
-      console.log('First run: applying course structures with default video URLs...')
+      console.log('First run (empty DB): applying course structures with default video URLs...')
     }
     
     // Apply course structures (this will update videos and add missing lessons)

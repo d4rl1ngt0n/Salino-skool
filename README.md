@@ -203,7 +203,7 @@ For the **backend** on Railway (same idea as Render):
      SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFiY2RlZmdoaWprbG1ub3AiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTY0NjE2ODAwMCwiZXhwIjoxOTYxNzQ0MDAwfQ.example
      JWT_SECRET=my-super-secret-jwt-key-change-this-to-something-random-12345
      ```
-     - **Optional:** Set `FORCE_COURSE_STRUCTURE=true` once if courses still show placeholder videos or missing lessons; it re-applies all course structures and real video URLs, then you can remove it.
+     - **Optional:** Set `FORCE_COURSE_STRUCTURE=true` once if courses still show placeholder videos or missing lessons; it re-applies all course structures. **Remove it after the deploy**—if left on, it will overwrite your video links and lesson edits on every request.
      
      **Note:** You don't need `VITE_API_URL` anymore! The frontend uses relative `/api` URLs that are automatically proxied to Netlify Functions.
    - Click **Deploy site**
