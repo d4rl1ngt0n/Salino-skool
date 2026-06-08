@@ -225,6 +225,32 @@ After first deploy, the default admin user is created:
 - Email: `test@salino.com`
 - Password: `test123`
 
+### Scheduled course smoke check
+
+The repository includes a GitHub Actions workflow at `.github/workflows/course-smoke-check.yml`.
+It runs every Monday and Thursday at 07:17 UTC, visits the deployed site, logs in through the API,
+opens a course, opens a lesson, and reads authenticated course progress.
+
+Configure these GitHub repository secrets before enabling it:
+
+- `SMOKE_SITE_URL` - your deployed site URL, for example `https://your-site.netlify.app`
+- `SMOKE_EMAIL` - the email for a real smoke-test user
+- `SMOKE_PASSWORD` - that user's password
+
+Optional secrets:
+
+- `SMOKE_API_BASE_URL` - set this only if the API is not available at `SMOKE_SITE_URL/api`
+- `SMOKE_COURSE_ID` - choose a specific course; otherwise the first course is used
+- `SMOKE_LESSON_ID` - choose a specific lesson in that course; otherwise the first lesson is used
+- `SMOKE_NOTIFY_WEBHOOK_URL` - send a success/failure notification after each run. Slack,
+  Discord, and most generic webhook receivers can use the posted `text`/`content` message.
+
+Optional repository variable:
+
+- `SMOKE_FRONTEND_PATH` - frontend route to visit before login, default `/`
+
+You can also run it manually from GitHub Actions with **Course smoke check -> Run workflow**.
+
 ---
 
 ## Deploy on Render (Dashboard) - Legacy Option
