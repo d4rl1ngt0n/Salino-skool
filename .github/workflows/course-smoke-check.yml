@@ -34,3 +34,65 @@ jobs:
           SMOKE_COURSE_ID: ${{ secrets.SMOKE_COURSE_ID }}
           SMOKE_LESSON_ID: ${{ secrets.SMOKE_LESSON_ID }}
           SMOKE_FRONTEND_PATH: ${{ vars.SMOKE_FRONTEND_PATH || '/' }}
+
+      - name: Notify smoke check result
+        if: always()
+        continue-on-error: true
+        env:
+          SMOKE_NOTIFY_WEBHOOK_URL: ${{ secrets.SMOKE_NOTIFY_WEBHOOK_URL }}
+          SMOKE_STATUS: ${{ job.status }}
+          SMOKE_SITE_URL: ${{ secrets.SMOKE_SITE_URL }}
+          SMOKE_COURSE_ID: ${{ secrets.SMOKE_COURSE_ID }}
+          SMOKE_LESSON_ID: ${{ secrets.SMOKE_LESSON_ID }}
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SMOKE_NOTIFY_WEBHOOK_URL" ]; then
+            echo "SMOKE_NOTIFY_WEBHOOK_URL is not configured; skipping notification."
+            exit 0
+          fi
+
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          status = os.environ.get("SMOKE_STATUS", "unknown")
+          label = "SUCCESS" if status == "success" else "FAILED"
+          site_url = os.environ.get("SMOKE_SITE_URL", "unknown site")
+          course_id = os.environ.get("SMOKE_COURSE_ID") or "default"
+          lesson_id = os.environ.get("SMOKE_LESSON_ID") or "default"
+          run_url = os.environ.get("GITHUB_RUN_URL", "")
+
+          message = (
+              f"[{label}] Salino course smoke check {status}. "
+              f"Site: {site_url}. Course: {course_id}. Lesson: {lesson_id}. "
+              f"Run: {run_url}"
+          )
+          payload = {
+              "text": message,
+              "content": message,
+              "status": status,
+              "site_url": site_url,
+              "course_id": course_id,
+              "lesson_id": lesson_id,
+              "run_url": run_url,
+          }
+
+          request = urllib.request.Request(
+              os.environ["SMOKE_NOTIFY_WEBHOOK_URL"],
+              data=json.dumps(payload).encode("utf-8"),
+              headers={
+                  "Content-Type": "application/json",
+                  "User-Agent": "salino-course-smoke-check/1.0",
+              },
+              method="POST",
+          )
+
+          try:
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  print(f"Notification sent with status {response.status}")
+          except urllib.error.HTTPError as error:
+              body = error.read().decode("utf-8", errors="replace")
+              raise SystemExit(f"Notification failed with status {error.code}: {body}")
+          PY

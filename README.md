@@ -242,6 +242,8 @@ Optional secrets:
 - `SMOKE_API_BASE_URL` - set this only if the API is not available at `SMOKE_SITE_URL/api`
 - `SMOKE_COURSE_ID` - choose a specific course; otherwise the first course is used
 - `SMOKE_LESSON_ID` - choose a specific lesson in that course; otherwise the first lesson is used
+- `SMOKE_NOTIFY_WEBHOOK_URL` - send a success/failure notification after each run. Slack,
+  Discord, and most generic webhook receivers can use the posted `text`/`content` message.
 
 Optional repository variable:
 
