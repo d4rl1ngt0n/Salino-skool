@@ -96,3 +96,81 @@ jobs:
               body = error.read().decode("utf-8", errors="replace")
               raise SystemExit(f"Notification failed with status {error.code}: {body}")
           PY
+
+      - name: Email smoke check result
+        if: always()
+        continue-on-error: true
+        env:
+          SMOKE_NOTIFY_EMAIL_TO: ${{ secrets.SMOKE_NOTIFY_EMAIL_TO }}
+          SMOKE_NOTIFY_EMAIL_FROM: ${{ secrets.SMOKE_NOTIFY_EMAIL_FROM }}
+          SMOKE_NOTIFY_SMTP_HOST: ${{ secrets.SMOKE_NOTIFY_SMTP_HOST }}
+          SMOKE_NOTIFY_SMTP_PORT: ${{ secrets.SMOKE_NOTIFY_SMTP_PORT }}
+          SMOKE_NOTIFY_SMTP_USERNAME: ${{ secrets.SMOKE_NOTIFY_SMTP_USERNAME }}
+          SMOKE_NOTIFY_SMTP_PASSWORD: ${{ secrets.SMOKE_NOTIFY_SMTP_PASSWORD }}
+          SMOKE_NOTIFY_SMTP_STARTTLS: ${{ vars.SMOKE_NOTIFY_SMTP_STARTTLS || 'true' }}
+          SMOKE_STATUS: ${{ job.status }}
+          SMOKE_SITE_URL: ${{ secrets.SMOKE_SITE_URL }}
+          SMOKE_COURSE_ID: ${{ secrets.SMOKE_COURSE_ID }}
+          SMOKE_LESSON_ID: ${{ secrets.SMOKE_LESSON_ID }}
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          required=(
+            SMOKE_NOTIFY_EMAIL_TO
+            SMOKE_NOTIFY_EMAIL_FROM
+            SMOKE_NOTIFY_SMTP_HOST
+            SMOKE_NOTIFY_SMTP_PORT
+            SMOKE_NOTIFY_SMTP_USERNAME
+            SMOKE_NOTIFY_SMTP_PASSWORD
+          )
+
+          for name in "${required[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "$name is not configured; skipping email notification."
+              exit 0
+            fi
+          done
+
+          python3 <<'PY'
+          import os
+          import smtplib
+          from email.message import EmailMessage
+
+          status = os.environ.get("SMOKE_STATUS", "unknown")
+          label = "SUCCESS" if status == "success" else "FAILED"
+          site_url = os.environ.get("SMOKE_SITE_URL", "unknown site")
+          course_id = os.environ.get("SMOKE_COURSE_ID") or "default"
+          lesson_id = os.environ.get("SMOKE_LESSON_ID") or "default"
+          run_url = os.environ.get("GITHUB_RUN_URL", "")
+
+          subject = f"[{label}] Salino course smoke check"
+          body = "\n".join([
+              f"Salino course smoke check {status}.",
+              "",
+              f"Site: {site_url}",
+              f"Course: {course_id}",
+              f"Lesson: {lesson_id}",
+              f"GitHub Actions run: {run_url}",
+          ])
+
+          message = EmailMessage()
+          message["Subject"] = subject
+          message["From"] = os.environ["SMOKE_NOTIFY_EMAIL_FROM"]
+          message["To"] = os.environ["SMOKE_NOTIFY_EMAIL_TO"]
+          message.set_content(body)
+
+          host = os.environ["SMOKE_NOTIFY_SMTP_HOST"]
+          port = int(os.environ["SMOKE_NOTIFY_SMTP_PORT"])
+          username = os.environ["SMOKE_NOTIFY_SMTP_USERNAME"]
+          password = os.environ["SMOKE_NOTIFY_SMTP_PASSWORD"]
+          starttls = os.environ.get("SMOKE_NOTIFY_SMTP_STARTTLS", "true").lower() != "false"
+
+          with smtplib.SMTP(host, port, timeout=30) as server:
+              server.ehlo()
+              if starttls:
+                  server.starttls()
+                  server.ehlo()
+              server.login(username, password)
+              server.send_message(message)
+
+          print("Email notification sent.")
+          PY
