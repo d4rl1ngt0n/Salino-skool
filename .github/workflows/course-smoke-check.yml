@@ -1,0 +1,36 @@
+name: Course smoke check
+
+on:
+  schedule:
+    # Twice weekly: Monday and Thursday at 07:17 UTC.
+    - cron: '17 7 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  course-smoke-check:
+    name: Log in and access a course
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run course smoke check
+        run: npm run smoke:course
+        env:
+          SMOKE_SITE_URL: ${{ secrets.SMOKE_SITE_URL }}
+          SMOKE_API_BASE_URL: ${{ secrets.SMOKE_API_BASE_URL }}
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+          SMOKE_COURSE_ID: ${{ secrets.SMOKE_COURSE_ID }}
+          SMOKE_LESSON_ID: ${{ secrets.SMOKE_LESSON_ID }}
+          SMOKE_FRONTEND_PATH: ${{ vars.SMOKE_FRONTEND_PATH || '/' }}
