@@ -245,9 +245,30 @@ Optional secrets:
 - `SMOKE_NOTIFY_WEBHOOK_URL` - send a success/failure notification after each run. Slack,
   Discord, and most generic webhook receivers can use the posted `text`/`content` message.
 
+Email notification secrets:
+
+- `SMOKE_NOTIFY_EMAIL_TO` - recipient email address
+- `SMOKE_NOTIFY_EMAIL_FROM` - sender email address
+- `SMOKE_NOTIFY_SMTP_HOST` - SMTP server hostname
+- `SMOKE_NOTIFY_SMTP_PORT` - SMTP port, usually `587`
+- `SMOKE_NOTIFY_SMTP_USERNAME` - SMTP username
+- `SMOKE_NOTIFY_SMTP_PASSWORD` - SMTP password or app password
+
+For Gmail, use:
+
+```env
+SMOKE_NOTIFY_SMTP_HOST=smtp.gmail.com
+SMOKE_NOTIFY_SMTP_PORT=587
+SMOKE_NOTIFY_SMTP_USERNAME=your-gmail-address@gmail.com
+SMOKE_NOTIFY_SMTP_PASSWORD=your-google-app-password
+SMOKE_NOTIFY_EMAIL_FROM=your-gmail-address@gmail.com
+SMOKE_NOTIFY_EMAIL_TO=recipient@example.com
+```
+
 Optional repository variable:
 
 - `SMOKE_FRONTEND_PATH` - frontend route to visit before login, default `/`
+- `SMOKE_NOTIFY_SMTP_STARTTLS` - set to `false` only if your SMTP provider does not use STARTTLS
 
 You can also run it manually from GitHub Actions with **Course smoke check -> Run workflow**.
 
